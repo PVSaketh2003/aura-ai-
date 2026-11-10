@@ -161,11 +161,10 @@ jobs:
       - name: Frontend, API, same-origin /api proxy, CORS for the frontend origin
         run: |
           set -e
-          curl -fsS https://aura.pvsairamsaketh.in/ | grep -q '<div id="root">'
-          curl -fsS https://aura.pvsairamsaketh.in/messenger | grep -q '<div id="root">'
+          curl -fsS https://akku.pvsairamsaketh.in/ | grep -q '<div id="root">'
+          curl -fsS https://akku.pvsairamsaketh.in/messenger | grep -q '<div id="root">'
           curl -fsS https://api.aura.pvsairamsaketh.in/healthz | grep -q ok
           curl -fsS https://api.aura.pvsairamsaketh.in/api/health/ | grep -q '"ok"'
-          curl -fsS https://aura.pvsairamsaketh.in/api/health/ | grep -q '"ok"'
-          curl -fsSI -H "Origin: https://aura.pvsairamsaketh.in" https://api.aura.pvsairamsaketh.in/api/auth/session/ \
-            | grep -qi "access-control-allow-origin: https://aura.pvsairamsaketh.in"
+          curl -fsSI -H "Origin: https://akku.pvsairamsaketh.in" https://api.aura.pvsairamsaketh.in/api/auth/session/ \
+            | grep -qi "access-control-allow-origin: https://akku.pvsairamsaketh.in"
           echo "live site OK"
