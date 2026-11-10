@@ -71,13 +71,14 @@ jobs:
           TV=$(grep -E '^torchvision==' requirements.txt | cut -d= -f3)
           pip install --index-url https://download.pytorch.org/whl/cpu "torch==$TORCH" "torchaudio==$TA" "torchvision==$TV"
           pip install -r requirements.txt
+          pip install pytest-github-actions-annotate-failures==0.3.0  # failing tests appear as annotations
       - name: Django checks, complete migrations, static files
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
           python manage.py collectstatic --noinput -v 0
       - name: Tests
-        run: python -m pytest -p no:warnings --junitxml=pytest-report.xml
+        run: python -m pytest -p no:warnings -rf --junitxml=pytest-report.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: backend-test-report, path: backend/pytest-report.xml }
