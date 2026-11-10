@@ -9,17 +9,16 @@ services:
     name: aura-backend
     runtime: docker
     region: singapore
-    plan: starter                        # 512 MB: chat, RAG, messenger. Voice (LOCAL_SPEECH=true) needs "pro" (4 GB).
+    plan: free                           # 512 MB, sleeps after 15 min idle. Voice (LOCAL_SPEECH=true) needs "pro" (4 GB).
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /healthz
     autoDeployTrigger: checksPass
     buildFilter:
       paths: ["backend/**"]
-    disk:
-      name: aura-data
-      mountPath: /var/data               # ChromaDB, uploads, media, downloaded speech models: survive deploys
-      sizeGB: 5
+    # No disk on the free plan: /var/data (ChromaDB, uploads, media) is EPHEMERAL and is reset on every deploy or
+    # restart. For permanent storage use plan: starter and add:
+    #   disk: { name: aura-data, mountPath: /var/data, sizeGB: 5 }
     domains:
       - api.aura.pvsairamsaketh.in
     envVars:
@@ -91,8 +90,6 @@ services:
     envVars:
       - key: VITE_API_URL                 # public: baked into the JS at build time (no secrets here)
         value: https://api.aura.pvsairamsaketh.in
-      - key: BACKEND_HOSTPORT             # backend's private-network address, for same-origin /api media links
-        fromService: { type: web, name: aura-backend, property: hostport }
 
   - type: keyvalue
     name: aura-redis
@@ -104,7 +101,7 @@ services:
 databases:
   - name: aura-db
     region: singapore
-    plan: basic-256mb                     # paid: free Postgres is deleted after 30 days
+    plan: free                            # free Postgres expires 30 days after creation (upgrade to keep it)
     postgresMajorVersion: "16"
     databaseName: aura
     user: aura

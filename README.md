@@ -165,8 +165,8 @@ git push ─► GitHub Actions: backend tests (Postgres+Redis) · frontend lint/
                  ▼
 Render (render.yaml, autoDeployTrigger: checksPass, per-folder buildFilter)
    aura-frontend  https://aura.pvsairamsaketh.in       nginx + React build   frontend/Dockerfile   (free)
-   aura-backend   https://api.aura.pvsairamsaketh.in   Daphne + Django       backend/Dockerfile    (starter + 5 GB disk)
-   aura-db        PostgreSQL 16 (private)              aura-redis  Key Value for Channels (free, private)
+   aura-backend   https://api.aura.pvsairamsaketh.in   Daphne + Django       backend/Dockerfile    (free: no disk)
+   aura-db        PostgreSQL 16 (free, 30 days)        aura-redis  Key Value for Channels (free, private)
 ```
 
 * The browser calls the API host directly: REST over HTTPS and `wss://` WebSockets (`VITE_API_URL`, built into the
@@ -191,8 +191,11 @@ Render (render.yaml, autoDeployTrigger: checksPass, per-folder buildFilter)
 **Deploy (one time)**
 1. Push to `main`.
 2. Render → **New → Blueprint** → connect GitHub → `PVSaketh2003/aura-ai-` → it reads `render.yaml` → enter the
-   `sync: false` values (table below) → **Apply**. Render asks for a card: the backend (starter + disk) and Postgres are
-   paid, about **US$14/month** in total; the frontend and Key Value are free.
+   `sync: false` values (table below) → **Apply**. Everything is on Render's **free** plans (no card). Free-plan limits:
+   the backend sleeps after 15 minutes idle (the first request then takes about a minute), it has **no persistent
+   disk** (uploaded PDFs, the vector index and shared files are reset on every deploy or restart), and the free
+   database expires after 30 days. To make it permanent: backend `plan: starter` + the `disk:` block shown in
+   `render.yaml`, and `aura-db` `plan: basic-256mb` (about US$14/month).
 3. Wait for both services to be **Live**. Each one's **Settings → Custom Domains** already lists its domain from the
    Blueprint, together with the exact target Render wants.
 4. Cloudflare → `pvsairamsaketh.in` → **DNS → Records** → *Add record* (leave every existing record alone, including
