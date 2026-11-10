@@ -39,6 +39,8 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "apps.core.healthz.PublicAdminGuardMiddleware",
+    "apps.core.cookies.SiteCookieMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -113,8 +115,8 @@ CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_TRUSTED_ORIGINS = env.frontend_origins
 CORS_ALLOWED_ORIGINS = env.frontend_origins
 CORS_ALLOW_CREDENTIALS = True
-if env.cookie_domain:
-    SESSION_COOKIE_DOMAIN = CSRF_COOKIE_DOMAIN = env.cookie_domain
+# Cookie domain + Secure flag are decided per request by apps.core.cookies.SiteCookieMiddleware when COOKIE_DOMAIN is
+# set (public HTTPS host → shared ".pvsairamsaketh.in" + Secure; localhost → plain), so both ways in keep working.
 SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = env.secure_cookies
 if env.behind_https_proxy:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

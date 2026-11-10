@@ -11,6 +11,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -35,6 +37,7 @@ def _err(msg, status=400):
     return Response({"detail": str(msg)}, status=status)
 
 
+@method_decorator(csrf_protect, name="dispatch")  # sign-up/sign-in are CSRF-checked even when anonymous
 class Throttled(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth"

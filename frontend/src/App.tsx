@@ -7,6 +7,7 @@ import { AgentProvider } from './context/AgentContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppLayout } from './layouts/AppLayout'
 import { AuthPage } from './pages/AuthPage'
+import { OfflinePage } from './pages/OfflinePage'
 import { ChatPage } from './pages/ChatPage'
 import { GalaxyPage } from './pages/GalaxyPage'
 import { VoiceTrainPage } from './pages/VoiceTrainPage'
@@ -18,11 +19,13 @@ import { MessengerProvider } from './context/MessengerContext'
 import { CallOverlay } from './components/messenger/bits'
 
 function Gate() {
-  const { user, loading } = useAuth()
+  const { user, loading, offline } = useAuth()
   return (
     <AnimatePresence mode="wait">
       {loading ? (
         <motion.div key="l" exit={{ opacity: 0 }} className="relative z-10 grid h-full place-items-center"><Orb size={64} mode="thinking" /></motion.div>
+      ) : offline && !user ? (
+        <motion.div key="o" className="h-full" exit={{ opacity: 0 }}><OfflinePage /></motion.div>
       ) : !user ? (
         <motion.div key="a" className="h-full" exit={{ opacity: 0 }}><AuthPage /></motion.div>
       ) : (

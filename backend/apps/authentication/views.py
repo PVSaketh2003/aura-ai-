@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -36,6 +36,7 @@ class SessionView(APIView):
                          "setup_required": not User.objects.exists()})
 
 
+@method_decorator(csrf_protect, name="dispatch")  # also for anonymous users: no login CSRF
 class SetupView(APIView):
     """Creates the single owner account. Only allowed while no user exists."""
     permission_classes = [AllowAny]
@@ -61,6 +62,7 @@ class SetupView(APIView):
         return Response({"user": _user(u)}, status=status.HTTP_201_CREATED)
 
 
+@method_decorator(csrf_protect, name="dispatch")  # also for anonymous users: no login CSRF
 class LoginView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
@@ -78,6 +80,7 @@ class LoginView(APIView):
         return Response({"user": _user(u)})
 
 
+@method_decorator(csrf_protect, name="dispatch")  # also for anonymous users: no login CSRF
 class LogoutView(APIView):
     def post(self, request):
         audit(request.user, "auth.logout", request.user.username)
