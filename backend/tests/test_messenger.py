@@ -347,6 +347,6 @@ def test_translate_targets_the_latest_text_not_a_file(trio, monkeypatch):
 
     class Ans:
         answer = "5 గంటలకు లైబ్రరీలో కలుద్దాం"
-    monkeypatch.setattr("services.llm.structured.generate_answer", lambda m, **k: (seen.setdefault("p", m), (Ans(), {}))[1])
+    monkeypatch.setattr("services.llm.structured.generate_answer", lambda m, **k: (seen.setdefault("p", m), (Ans(), {"model": "stand-in"}))[1])
     a.post(f"/api/messenger/chats/{cid}/ai/", {"action": "translate", "language": "te"}, format="json")
     assert "<message>\nSee you at the library at 5\n</message>" in seen["p"][1]["content"] and "Telugu" in seen["p"][1]["content"]
