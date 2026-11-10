@@ -9,7 +9,7 @@ def test_first_run_setup_then_locked():
     assert c.get("/api/auth/session/").json()["setup_required"] is True
     r = c.post("/api/auth/setup/", {"username": "me", "password": "a-strong-passphrase", "display_name": "Sai"})
     assert r.status_code == 201 and r.json()["user"]["display_name"] == "Sai"
-    assert c.get("/api/auth/session/").json() == {"authenticated": True, "setup_required": False, "setup_code_required": False,
+    assert c.get("/api/auth/session/").json() == {"authenticated": True, "setup_required": False, "setup_verification": "none", "setup_code_required": False,
                                                   "user": {"id": r.json()["user"]["id"], "username": "me",
                                                            "display_name": "Sai"}}
     r2 = APIClient().post("/api/auth/setup/", {"username": "intruder", "password": "another-strong-pass"})

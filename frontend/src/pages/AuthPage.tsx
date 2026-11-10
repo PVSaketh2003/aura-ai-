@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { Orb } from '../components/Orb'
 import { useAuth } from '../context/AuthContext'
 import { mx } from '../services/messenger'
+import { api } from '../services/api'
 import { COUNTRIES } from '../components/messenger/bits'
 import { cx } from '../utils/format'
 
@@ -17,17 +18,30 @@ function Field({ label, ...p }: { label: string } & React.InputHTMLAttributes<HT
 }
 
 export function AuthPage() {
-  const { setupRequired, setupCodeRequired, login, setup, error: bootError } = useAuth()
+  const { setupRequired, setupCodeRequired, setupVerification, login, setup, error: bootError } = useAuth()
+  const byEmail = setupRequired && setupVerification === 'email'
+  const [codeSentTo, setCodeSentTo] = useState('')
+  const [info, setInfo] = useState('')
   const [mode, setMode] = useState<'password' | 'phone'>('password')
-  const [f, setF] = useState({ name: '', username: '', password: '', code: '' })
+  const [f, setF] = useState({ name: '', username: '', password: '', code: '', email: '', emailCode: '' })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value })
 
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setErr(''); setBusy(true)
-    try { setupRequired ? await setup(f.username, f.password, f.name, f.code) : await login(f.username, f.password) }
-    catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
+    try {
+      if (byEmail && !codeSentTo) {  // step 1: email the one-time code
+        const r = await api.emailCode(f.email)
+        setCodeSentTo(r.email); setInfo(`We sent a 6-digit code to ${r.email}. It expires in 10 minutes.`)
+      } else if (byEmail) {          // step 2: create the account with the code
+        await setup(codeSentTo, f.password, f.name, undefined, codeSentTo, f.emailCode)
+      } else if (setupRequired) {
+        await setup(f.username, f.password, f.name, f.code)
+      } else {
+        await login(f.username, f.password)
+      }
+    } catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
   }
 
   return (
@@ -50,12 +64,16 @@ export function AuthPage() {
         {mode === 'phone' && !setupRequired ? <PhoneAuth /> : (
         <form onSubmit={submit} className="mt-10 space-y-7">
           {setupRequired && <Field label="Your name" value={f.name} onChange={set('name')} placeholder="What should I call you?" autoFocus />}
-          <Field label="Username" value={f.username} onChange={set('username')} autoComplete="username" autoFocus={!setupRequired} required />
+          {byEmail
+            ? <Field label="Email" type="email" value={f.email} onChange={set('email')} autoComplete="email" required disabled={!!codeSentTo} />
+            : <Field label={setupRequired ? 'Username' : 'Username or email'} value={f.username} onChange={set('username')} autoComplete="username" autoFocus={!setupRequired} required />}
           <Field label="Password" type="password" value={f.password} onChange={set('password')} autoComplete={setupRequired ? 'new-password' : 'current-password'} required minLength={8} />
-          {setupRequired && setupCodeRequired && <Field label="Setup code (from your hosting dashboard)" value={f.code} onChange={set('code')} autoComplete="off" required />}
+          {setupRequired && setupCodeRequired && !byEmail && <Field label="Setup code (from your hosting dashboard)" value={f.code} onChange={set('code')} autoComplete="off" required />}
+          {byEmail && codeSentTo && <Field label="6-digit code from your email" value={f.emailCode} onChange={(e) => setF({ ...f, emailCode: e.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" autoComplete="one-time-code" autoFocus required />}
+          {info && !err && <p className="text-[13px] text-mint">{info} {codeSentTo && <button type="button" className="text-violet underline" onClick={() => { setCodeSentTo(''); setInfo('') }}>Change email / resend</button>}</p>}
           {(err || bootError) && <p className="text-[13px] text-rose">{err || bootError}</p>}
           <button disabled={busy} className="group flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3.5 text-[14px] font-medium text-white shadow-[0_10px_30px_-10px_rgb(12_12_16/.6)] transition hover:shadow-[0_14px_40px_-10px_rgb(167_123_255/.55)] disabled:opacity-60">
-            {busy ? 'One moment…' : setupRequired ? 'Create account' : 'Sign in'}
+            {busy ? 'One moment…' : byEmail && !codeSentTo ? 'Send code' : setupRequired ? 'Create account' : 'Sign in'}
             <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
           </button>
         </form>

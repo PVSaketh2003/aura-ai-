@@ -94,6 +94,16 @@ class AppSettings(BaseSettings):
     # One-time code required to create the owner account on a fresh public deployment (empty = not required, e.g.
     # on the Mac). Set it in the hosting dashboard; you read it there, so nobody else can claim a new server first.
     setup_code: str = ""
+    # Email one-time codes (owner sign-up). Provider: "smtp" (e.g. Gmail with an App Password) or "brevo" (HTTPS API,
+    # for hosts that block SMTP ports); "" = email codes off. Only addresses in OWNER_EMAILS may become the owner.
+    email_provider: str = ""
+    email_from: str = "Aura <pvsaketh1@gmail.com>"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    brevo_api_key: str = ""
+    owner_emails: CSV = []
 
     # --- Messenger ---
     # SMS delivery for phone verification: "twilio" (Twilio Verify) or "dev" (DEBUG-only local outbox file); "" = off
@@ -107,7 +117,7 @@ class AppSettings(BaseSettings):
     # Empty = host candidates only (works on localhost / the same network; calls across the internet need STUN/TURN).
     webrtc_ice_servers: str = "[]"
 
-    @field_validator("llm_fallback_models", "allowed_hosts", "frontend_origins", mode="before")
+    @field_validator("llm_fallback_models", "allowed_hosts", "frontend_origins", "owner_emails", mode="before")
     @classmethod
     def _split_csv(cls, v):
         if isinstance(v, str):

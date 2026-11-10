@@ -65,6 +65,19 @@ services:
         sync: false
       - key: LOCAL_SPEECH                 # speech models need ~4 GB; voice is text-only until a larger plan
         value: "false"
+      # --- Owner sign-up by email code (sent from pvsaketh1@gmail.com) ---
+      - key: EMAIL_PROVIDER               # smtp (Gmail App Password) or brevo (HTTPS API)
+        value: smtp
+      - key: EMAIL_FROM
+        value: Aura <pvsaketh1@gmail.com>
+      - key: SMTP_USER
+        value: pvsaketh1@gmail.com
+      - key: SMTP_PASSWORD                # Google App Password (secret), never the normal Gmail password
+        sync: false
+      - key: BREVO_API_KEY                # only if EMAIL_PROVIDER=brevo
+        sync: false
+      - key: OWNER_EMAILS                 # who may create the owner account
+        value: pvsaketh1@gmail.com,pvsairamsaketh@gmail.com
       - key: SMS_BACKEND                  # "twilio" for phone sign-up; leave empty to disable phone verification
         sync: false
       - key: TWILIO_ACCOUNT_SID

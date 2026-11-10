@@ -41,8 +41,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 const json = (b: unknown) => JSON.stringify(b)
 
 export const api = {
-  session: () => request<{ authenticated: boolean; user: User | null; setup_required: boolean; setup_code_required?: boolean }>('/api/auth/session/'),
-  setup: (b: { username: string; password: string; display_name: string; setup_code?: string }) =>
+  session: () => request<{ authenticated: boolean; user: User | null; setup_required: boolean; setup_code_required?: boolean; setup_verification?: 'email' | 'code' | 'none' }>('/api/auth/session/'),
+  emailCode: (email: string) => request<{ sent: boolean; email: string }>('/api/auth/email-code/', { method: 'POST', body: json({ email, purpose: 'setup' }) }),
+  setup: (b: { username: string; password: string; display_name: string; setup_code?: string; email?: string; email_code?: string }) =>
     request<{ user: User }>('/api/auth/setup/', { method: 'POST', body: json(b) }),
   login: (b: { username: string; password: string }) => request<{ user: User }>('/api/auth/login/', { method: 'POST', body: json(b) }),
   logout: () => request<void>('/api/auth/logout/', { method: 'POST' }),

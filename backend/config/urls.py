@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/auth/phone/login/", messenger.PhoneLoginView.as_view()),
     path("api/auth/session/", auth.SessionView.as_view()),
     path("api/auth/setup/", auth.SetupView.as_view()),
+    path("api/auth/email-code/", auth.EmailCodeView.as_view()),
     path("api/auth/login/", auth.LoginView.as_view()),
     path("api/auth/logout/", auth.LogoutView.as_view()),
     path("api/speech/transcribe/", TranscribeView.as_view()),
