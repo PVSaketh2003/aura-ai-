@@ -1,12 +1,12 @@
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from 'motion/react'
 import { useRef } from 'react'
-import { AudioLines, Brain, LibraryBig, LogOut, MessageCircle, MessagesSquare, Orbit, SlidersHorizontal } from 'lucide-react'
+import { AudioLines, Brain, LibraryBig, MessageCircle, MessagesSquare, Orbit, SlidersHorizontal } from 'lucide-react'
 import { useMessenger } from '../context/MessengerContext'
 import { NavLink } from 'react-router-dom'
 import { useAgent } from '../context/AgentContext'
-import { useAuth } from '../context/AuthContext'
 import { cx } from '../utils/format'
 import { StatusDot } from './ui'
+import { AccountMenu } from './Shell'
 
 const NAV = [
   { to: '/', icon: MessageCircle, label: 'Aura AI' },
@@ -20,11 +20,10 @@ const NAV = [
 
 export function Rail() {
   const { socket } = useAgent()
-  const { user, logout } = useAuth()
   const { unreadTotal } = useMessenger()
   const mouseY = useMotionValue(Infinity)
   return (
-    <nav className="glass spot spot-border relative z-20 m-3 flex w-[60px] shrink-0 flex-col items-center rounded-[22px] border border-line py-4 shadow-soft">
+    <nav aria-label="Main" className="glass spot spot-border relative z-20 m-3 flex w-[60px] shrink-0 flex-col items-center rounded-[22px] border border-line py-4 shadow-soft max-md:hidden">
       <div className="mb-6 h-7 w-7 rounded-full bg-[radial-gradient(circle_at_35%_30%,#fff,#ffb08a_35%,#b98cff_70%,#6f9bff)] shadow-[0_4px_14px_-2px_rgb(167_123_255/.5)]" title="Aura" />
       <div className="flex flex-col gap-1.5" onMouseMove={(e) => mouseY.set(e.clientY)} onMouseLeave={() => mouseY.set(Infinity)}>
         {NAV.map(({ to, icon: Icon, label }) => (
@@ -46,11 +45,7 @@ export function Rail() {
         <span title={`Live connection: ${socket}`} className="grid h-6 w-6 place-items-center">
           <StatusDot tone={socket === 'open' ? 'ok' : socket === 'connecting' ? 'warn' : 'down'} pulse={socket !== 'open'} />
         </span>
-        <button onClick={logout} title={`Sign out ${user?.display_name ?? ''}`}
-          className="group grid h-9 w-9 place-items-center rounded-full border border-line bg-white text-[12px] font-semibold text-ink-2 transition hover:border-line-2">
-          <span className="group-hover:hidden">{(user?.display_name ?? '?').slice(0, 1).toUpperCase()}</span>
-          <LogOut size={14} className="hidden text-mute group-hover:block" />
-        </button>
+        <AccountMenu />
       </div>
     </nav>
   )

@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
+import { lazy } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Aurora } from './components/Aurora'
 import { Orb } from './components/Orb'
@@ -8,13 +9,13 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppLayout } from './layouts/AppLayout'
 import { AuthPage } from './pages/AuthPage'
 import { OfflinePage } from './pages/OfflinePage'
-import { ChatPage } from './pages/ChatPage'
-import { GalaxyPage } from './pages/GalaxyPage'
-import { VoiceTrainPage } from './pages/VoiceTrainPage'
-import { LibraryPage } from './pages/LibraryPage'
-import { MemoryPage } from './pages/MemoryPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { MessengerPage } from './pages/MessengerPage'
+const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
+const GalaxyPage = lazy(() => import('./pages/GalaxyPage').then((m) => ({ default: m.GalaxyPage })))
+const VoiceTrainPage = lazy(() => import('./pages/VoiceTrainPage').then((m) => ({ default: m.VoiceTrainPage })))
+const LibraryPage = lazy(() => import('./pages/LibraryPage').then((m) => ({ default: m.LibraryPage })))
+const MemoryPage = lazy(() => import('./pages/MemoryPage').then((m) => ({ default: m.MemoryPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const MessengerPage = lazy(() => import('./pages/MessengerPage').then((m) => ({ default: m.MessengerPage })))
 import { MessengerProvider } from './context/MessengerContext'
 import { CallOverlay } from './components/messenger/bits'
 

@@ -59,7 +59,7 @@ export function MessengerPage() {
       </aside>
 
       {/* list column */}
-      <section className={cx('flex w-full shrink-0 flex-col border-r border-line bg-white/25 lg:w-[360px]', chatId && 'max-lg:hidden')}>
+      <section className={cx('flex min-w-0 flex-1 flex-col border-r border-line bg-white/25 lg:w-[360px] lg:flex-none', chatId && 'max-lg:hidden')}>
         {section === 'chats' && <ChatList title="Chats" chats={chats} onOpen={(id) => go('chats', id)} active={chatId} onNewGroup={() => setNewGroup(true)} onContacts={() => go('contacts')} search />}
         {section === 'groups' && <ChatList title="Groups" chats={chats.filter((c) => c.kind === 'group')} onOpen={(id) => go('groups', id)} active={chatId} onNewGroup={() => setNewGroup(true)} groupsOnly />}
         {section === 'archived' && <ChatList title="Archived" chats={archived} onOpen={(id) => go('archived', id)} active={chatId} />}
