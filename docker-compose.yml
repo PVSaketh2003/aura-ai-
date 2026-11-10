@@ -1,0 +1,36 @@
+# Aura on any OS with Docker:   cp .env.docker.example .env && docker compose up -d
+# then pull the models once:    docker compose exec ollama ollama pull gemma3:4b && docker compose exec ollama ollama pull qwen3-embedding:4b
+# open http://localhost:8080
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: { POSTGRES_DB: aura, POSTGRES_USER: aura, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}" }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U aura"], interval: 5s, retries: 20 }
+  redis:
+    image: redis:7-alpine
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 20 }
+  ollama:
+    image: ollama/ollama:latest
+    volumes: [ollama:/root/.ollama]
+  backend:
+    image: ${DOCKERHUB_NAMESPACE:-aura}/aura-backend:${TAG:-latest}
+    build: ./backend
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+    environment:
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in .env (50+ random characters)}"
+      DJANGO_DEBUG: "false"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,backend"
+      FRONTEND_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
+      DATABASE_URL: "postgresql://aura:${POSTGRES_PASSWORD}@postgres:5432/aura"
+      REDIS_URL: "redis://redis:6379/0"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      HF_TOKEN: "${HF_TOKEN:-}"
+      SMS_BACKEND: "${SMS_BACKEND:-}"
+    volumes: [auradata:/var/data]
+  frontend:
+    image: ${DOCKERHUB_NAMESPACE:-aura}/aura-frontend:${TAG:-latest}
+    build: ./frontend
+    depends_on: [backend]
+    ports: ["8080:80"]
+volumes: { pgdata: {}, ollama: {}, auradata: {} }

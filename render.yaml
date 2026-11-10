@@ -1,0 +1,60 @@
+# Render Blueprint for the Aura backend (https://render.com/docs/blueprint-spec).
+# The web service runs the Docker image that GitHub Actions pushes to Docker Hub; CI triggers a deploy through the
+# service's deploy hook with the exact image tag. Values marked sync:false are entered once in the Render dashboard.
+services:
+  - type: web
+    name: aura-backend
+    runtime: image
+    image:
+      url: docker.io/REPLACE_WITH_DOCKERHUB_USERNAME/aura-backend:latest
+    plan: standard            # 2 GB RAM: chat, RAG, messenger. Voice (local speech models) needs "pro" (4 GB) or more.
+    region: singapore
+    healthCheckPath: /api/health/
+    disk:
+      name: aura-data
+      mountPath: /var/data    # ChromaDB, uploads, downloaded speech models — survives deploys
+      sizeGB: 20
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: ALLOWED_HOSTS
+        value: api.aura.pvsairamsaketh.in,aura-backend.onrender.com
+      - key: FRONTEND_ORIGINS
+        value: https://aura.pvsairamsaketh.in
+      - key: COOKIE_DOMAIN
+        value: .pvsairamsaketh.in
+      - key: SECURE_COOKIES
+        value: "true"
+      - key: BEHIND_HTTPS_PROXY
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase: { name: aura-db, property: connectionString }
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: aura-redis, property: connectionString }
+      - key: OLLAMA_BASE_URL     # an Ollama endpoint reachable from Render (see README → Deployment)
+        sync: false
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: HF_TOKEN            # gated IndicConformer download (Telugu/Hindi speech)
+        sync: false
+      - key: SMS_BACKEND         # "twilio" for real phone verification
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
+  - type: keyvalue
+    name: aura-redis
+    plan: starter
+    region: singapore
+    ipAllowList: []           # internal network only
+databases:
+  - name: aura-db
+    plan: basic-256mb
+    region: singapore
+    postgresMajorVersion: "16"
+    ipAllowList: []

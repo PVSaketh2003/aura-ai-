@@ -1,0 +1,38 @@
+# --- secrets: never committed ---
+.env
+.env.*
+!.env.example
+!.env.docker.example
+backend/.env
+**/*.pem
+**/*.key
+
+# --- personal data & large artefacts: never committed ---
+/*.pdf
+backend/data/
+backend/media/
+backend/staticfiles/
+backend/evaluation/asr/user/
+backend/evaluation/asr/fleurs/
+backend/evaluation/asr/*.partial.jsonl
+# evaluation outputs include transcripts of the owner's own voice recordings
+backend/finetuning/output/
+backend/pytest-report.xml
+
+# --- dependencies & build output ---
+backend/.venv/
+frontend/node_modules/
+frontend/dist/
+frontend/.vercel/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+.vscode/
+*.log
+backend/evaluation/asr/results.json
+backend/evaluation/asr/engines.json
+backend/evaluation/asr/lid_signals.jsonl

@@ -1,0 +1,15 @@
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+media/
+staticfiles/
+evaluation/asr/user/
+evaluation/asr/fleurs/
+evaluation/asr/*.partial.jsonl
+finetuning/output/
+*.log

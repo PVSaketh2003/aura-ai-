@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --color-paper: #fafaf8;
+  --color-ink: #0c0c10;
+  --color-ink-2: #3a3a44;
+  --color-mute: #8a8a96;
+  --color-faint: #b9b9c3;
+  --color-line: rgb(12 12 16 / 0.07);
+  --color-line-2: rgb(12 12 16 / 0.12);
+  --color-coral: #ff8a5b;
+  --color-violet: #a77bff;
+  --color-sky: #5b8cff;
+  --color-mint: #2fbf8f;
+  --color-rose: #e5484d;
+
+  --shadow-float: 0 1px 1px rgb(12 12 16 / 0.03), 0 8px 24px -6px rgb(12 12 16 / 0.08), 0 24px 64px -16px rgb(12 12 16 / 0.10);
+  --shadow-soft: 0 1px 2px rgb(12 12 16 / 0.04), 0 4px 16px -4px rgb(12 12 16 / 0.06);
+
+  --animate-breathe: breathe 6s ease-in-out infinite;
+  --animate-drift-a: drift-a 28s ease-in-out infinite alternate;
+  --animate-drift-b: drift-b 34s ease-in-out infinite alternate;
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-spin-slow: spin 1.4s linear infinite;
+}
+
+@keyframes drift-a { to { transform: translate3d(12vw, 8vh, 0) scale(1.15); } }
+@keyframes drift-b { to { transform: translate3d(-10vw, -6vh, 0) scale(1.2); } }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes breathe { 50% { opacity: .55; } }
+@keyframes xr-scan { from { left: -35%; } to { left: 100%; } }
+@keyframes xr-flow { from { left: -30%; } to { left: 110%; } }
+.xr-scan { animation: xr-scan 1.6s cubic-bezier(.4,0,.2,1) infinite; }
+.xr-flow { animation: xr-flow 1.1s linear infinite; }
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: rgb(167 123 255 / 0.18); }
+
+/* film grain — keeps the large flat areas from feeling digital */
+.grain::after {
+  content: ""; position: fixed; inset: -50%; pointer-events: none; z-index: 1; opacity: .035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.glass {
+  background: rgb(255 255 255 / 0.66);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+}
+
+.text-shimmer {
+  background: linear-gradient(90deg, var(--color-mute) 0%, var(--color-ink) 40%, var(--color-mute) 60%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+.aura-text {
+  background: linear-gradient(100deg, var(--color-coral), var(--color-violet) 50%, var(--color-sky));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.scroll-quiet { scrollbar-width: thin; scrollbar-color: rgb(12 12 16 / 0.12) transparent; }
+
+.prose-aura p { margin: 0 0 .85em; }
+.prose-aura p:last-child { margin-bottom: 0; }
+.prose-aura ul, .prose-aura ol { margin: 0 0 .85em; padding-left: 1.2em; }
+.prose-aura ul { list-style: disc; } .prose-aura ol { list-style: decimal; }
+.prose-aura li { margin: .25em 0; } .prose-aura li::marker { color: var(--color-faint); }
+.prose-aura strong { font-weight: 600; color: var(--color-ink); }
+.prose-aura h3 { font-family: var(--font-serif); font-size: 1.35em; margin: .6em 0 .3em; letter-spacing: -.01em; }
+.prose-aura code { font-family: var(--font-mono); font-size: .86em; background: rgb(12 12 16 / .05); padding: .1em .35em; border-radius: 6px; }
+.prose-aura pre { font-family: var(--font-mono); font-size: .82em; background: #f3f3f0; border: 1px solid var(--color-line); padding: 1em 1.1em; border-radius: 14px; overflow-x: auto; margin: 0 0 .85em; }
+.prose-aura pre code { background: none; padding: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* cursor spotlight on glass surfaces */
+.glass.spot, .spot {
+  background-image: radial-gradient(520px circle at var(--mx, -999px) var(--my, -999px), rgb(167 123 255 / 0.10), rgb(255 138 91 / 0.04) 35%, transparent 60%);
+  background-attachment: fixed;
+}
+.glass.spot { background-color: rgb(255 255 255 / 0.66); }
+.spot-border { position: relative; }
+.spot-border::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: radial-gradient(360px circle at var(--mx, -999px) var(--my, -999px), rgb(167 123 255 / .55), rgb(255 138 91 / .25) 40%, transparent 65%) fixed;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+@keyframes hello-in { from { opacity: 0; transform: translateY(8px); filter: blur(6px) } to { opacity: 1; transform: none; filter: none } }
+
+/* ============================================================================ Aura Light — signature effects */
+@property --ring { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes ring-spin { to { --ring: 360deg; } }
+/* animated aurora ring + bloom around the composer */
+.aurora-ring::after {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 0;
+  background: conic-gradient(from var(--ring), #ff8a5b, #c27bff, #5b8cff, #2fbf8f, #ff8a5b);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: ring-spin 6s linear infinite; opacity: .8;
+}
+.aurora-ring::before { /* soft coloured bloom under the ring */
+  content: ""; position: absolute; inset: 8px 24px -14px; border-radius: inherit; z-index: -1; pointer-events: none; filter: blur(26px); opacity: .45;
+  background: conic-gradient(from var(--ring), #ffb08a, #d6b8ff, #a9c2ff, #9fe3c9, #ffb08a); animation: ring-spin 6s linear infinite;
+}
+/* hero headline: ink that melts into the aura gradient */
+.hero-title { background: linear-gradient(180deg, #0c0c10 55%, #3a2c6e 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* user bubble: deep indigo glass with a violet glow */
+.user-bubble { background: linear-gradient(135deg, #1a1530 0%, #2f2460 55%, #4a2f7a 100%) !important;
+  box-shadow: 0 0 0 1px rgb(167 123 255 / .25), 0 18px 40px -16px rgb(91 60 190 / .55) !important; }
+/* livelier aurora wash in light */
+.aurora > div { opacity: .7 !important; }
+.composer-fade { display: none; }
+
+.md-table { margin: .2em 0 1em; overflow-x: auto; border: 1px solid var(--color-line); border-radius: 16px; }
+.md-table table { width: 100%; border-collapse: collapse; font-size: .9em; line-height: 1.5; }
+.md-table th { text-align: left; font-weight: 600; color: var(--color-ink); padding: .65em .9em; background: linear-gradient(90deg, rgb(255 138 91 / .10), rgb(167 123 255 / .10), rgb(91 140 255 / .10)); }
+.md-table td { padding: .6em .9em; border-top: 1px solid var(--color-line); vertical-align: top; }
+.md-table tr:hover td { background: rgb(167 123 255 / .05); }
+
+/* ============================================================================ Aura Prism (redesign, light only) */
+/* code blocks: the one dark surface — code reads best on dark */
+.code-card { margin: .2em 0 1em; border-radius: 16px; overflow: hidden; background: #14111f; border: 1px solid rgb(167 123 255 / .25);
+  box-shadow: 0 24px 60px -28px rgb(91 60 190 / .55), inset 0 1px 0 rgb(255 255 255 / .06); }
+.code-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; color: rgb(233 230 255 / .55);
+  background: linear-gradient(90deg, rgb(255 138 91 / .10), rgb(167 123 255 / .12), rgb(91 140 255 / .10)); border-bottom: 1px solid rgb(255 255 255 / .07); }
+.code-head .dot { display: inline-block; width: 10px; height: 10px; border-radius: 99px; }
+.code-copy { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 3px 9px; border-radius: 8px; transition: all .2s; color: rgb(233 230 255 / .7); }
+.code-copy:hover { background: rgb(255 255 255 / .1); color: #fff; }
+.prose-aura .code-card pre { margin: 0; border: 0; border-radius: 0; background: transparent; color: #ece9ff; padding: 14px 16px; font-size: .8em; line-height: 1.7; }
+.tk-kw { color: #c792ff; } .tk-str { color: #9be8b0; } .tk-com { color: #7d7896; font-style: italic; } .tk-num { color: #ffb38a; }
+.tk-fn { color: #82b4ff; } .tk-bi { color: #ffd479; } .tk-dec { color: #ff9ad5; }
+
+/* living aurora field behind the whole app: big soft colour curtains + dot grid, all GPU-composited */
+@keyframes curtain-a { 0% { transform: translate3d(-8%, -6%, 0) rotate(0deg) scale(1); } 100% { transform: translate3d(10%, 8%, 0) rotate(25deg) scale(1.25); } }
+@keyframes curtain-b { 0% { transform: translate3d(6%, 10%, 0) rotate(0deg) scale(1.15); } 100% { transform: translate3d(-12%, -6%, 0) rotate(-30deg) scale(.95); } }
+@keyframes curtain-c { 0% { transform: translate3d(0, 0, 0) scale(1); } 100% { transform: translate3d(-6%, 12%, 0) scale(1.3); } }
+.field { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background:
+  radial-gradient(1200px 700px at 50% -10%, #fff 0%, transparent 70%), linear-gradient(180deg, #fdfbff 0%, #f8f6f2 100%); }
+.field i { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; will-change: transform; }
+.field .c1 { width: 62vmax; height: 46vmax; left: -18vmax; top: -16vmax; background: radial-gradient(closest-side, var(--sky-1, #ffb59a), transparent); animation: curtain-a 26s ease-in-out infinite alternate; }
+.field .c2 { width: 58vmax; height: 50vmax; right: -20vmax; top: -10vmax; background: radial-gradient(closest-side, var(--sky-2, #cdb4ff), transparent); animation: curtain-b 32s ease-in-out infinite alternate; }
+.field .c3 { width: 70vmax; height: 40vmax; left: 10vmax; bottom: -24vmax; background: radial-gradient(closest-side, var(--sky-3, #a8c4ff), transparent); animation: curtain-c 38s ease-in-out infinite alternate; }
+.field .c4 { width: 34vmax; height: 30vmax; right: 8vmax; bottom: -8vmax; background: radial-gradient(closest-side, var(--sky-4, #a6ecd2), transparent); opacity: .45; animation: curtain-a 30s ease-in-out infinite alternate-reverse; }
+.field::after { content: ""; position: absolute; inset: 0; opacity: .5;
+  background-image: radial-gradient(rgb(12 12 16 / .12) 1px, transparent 1.2px); background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 0%, transparent 75%); mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 0%, transparent 75%); }
+
+/* polyglot halo: script glyphs orbiting the orb */
+@keyframes halo-spin { to { transform: rotate(360deg); } }
+@keyframes halo-counter { to { transform: rotate(-360deg); } }
+.halo-ring { position: absolute; inset: 0; animation: halo-spin 60s linear infinite; }
+.halo-ring:hover, .halo-ring:has(button:focus-visible) { animation-play-state: paused; }
+.halo-ring:hover .halo-glyph-inner, .halo-ring:has(button:focus-visible) .halo-glyph-inner { animation-play-state: paused; }
+.halo-glyph-inner { animation: halo-counter 60s linear infinite; }
+.halo-orbit { position: absolute; border-radius: 50%; border: 1px dashed rgb(167 123 255 / .28); }
+@keyframes spark { to { offset-distance: 100%; } }
+.spark { position: absolute; width: 7px; height: 7px; border-radius: 50%; offset-rotate: 0deg; animation: spark 9s linear infinite;
+  background: radial-gradient(circle, #fff 0%, #ff8a5b 45%, transparent 70%); box-shadow: 0 0 14px 4px rgb(255 138 91 / .55); }
+
+/* kinetic headline */
+.hero-name { background: linear-gradient(100deg, #ff7a4d 0%, #c45cff 45%, #4f7dff 90%); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: name-flow 8s ease-in-out infinite alternate; }
+@keyframes name-flow { to { background-position: 100% 0; } }
+
+/* bento capability cards */
+.bento { position: relative; overflow: hidden; isolation: isolate; }
+.bento::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity .4s;
+  background: radial-gradient(400px circle at var(--bx, 50%) var(--by, 50%), rgb(167 123 255 / .16), transparent 60%); }
+.bento:hover::before { opacity: 1; }
+.bento .glyph { position: absolute; right: -6px; bottom: -22px; font-size: 104px; line-height: 1; font-weight: 600; z-index: -1;
+  background: linear-gradient(160deg, rgb(167 123 255 / .16), rgb(255 138 91 / .10)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  transition: transform .6s cubic-bezier(.16,1,.3,1); }
+.bento:hover .glyph { transform: translateY(-6px) rotate(-6deg) scale(1.06); }
+@keyframes sheen { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(220%) skewX(-20deg); } }
+.bento::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / .7), transparent); transform: translateX(-120%) skewX(-20deg); }
+.bento:hover::after { animation: sheen .9s ease; }
+
+/* answer card: glass with an aurora spine */
+.answer-card { position: relative; border-radius: 26px; background: rgb(255 255 255 / .72); backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5); border: 1px solid rgb(12 12 16 / .06);
+  box-shadow: 0 1px 1px rgb(12 12 16 / .03), 0 18px 50px -24px rgb(91 60 190 / .25); }
+.answer-card::before { content: ""; position: absolute; left: -1px; top: 22px; bottom: 22px; width: 3px; border-radius: 3px;
+  background: linear-gradient(180deg, #ff8a5b, #a77bff 50%, #5b8cff); }
+.src-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 500; }
+
+/* voice phase ribbon */
+.phase-dot { width: 8px; height: 8px; border-radius: 99px; }
+@keyframes eq { 0%,100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+.eq span { display: inline-block; width: 3px; height: 14px; margin: 0 1px; border-radius: 3px; transform-origin: bottom; animation: eq 1s ease-in-out infinite; }
+
+/* mic halo while recording */
+@keyframes mic-ring { from { transform: scale(1); opacity: .55; } to { transform: scale(1.9); opacity: 0; } }
+.mic-ring { position: absolute; inset: 0; border-radius: 99px; border: 2px solid #a77bff; animation: mic-ring 1.6s ease-out infinite; }
+
+/* gradient send button */
+.btn-aura { background: linear-gradient(135deg, #ff7a4d, #b35cff 55%, #4f7dff); box-shadow: 0 10px 24px -10px rgb(150 80 255 / .7); }
+.btn-aura:disabled { background: rgb(12 12 16 / .08); box-shadow: none; }
+.act { display: inline-flex; align-items: center; gap: 5px; border-radius: 9px; padding: 4px 8px; color: var(--color-mute); transition: all .18s; }
+.act:hover:not(:disabled) { background: rgb(12 12 16 / .05); color: var(--color-ink); }
+.act:disabled { opacity: .4; }
+
+@keyframes page-scan { from { top: -12px; } to { top: 46px; } }
+.page-scan { animation: page-scan 1.1s linear infinite; }
+
+/* ---------------------------------------------------------------------------------------------- living sky
+   The aurora curtains follow the time of day (set on <html data-sky> by AppLayout). Always a LIGHT sky. */
+.field i { transition: background 4s ease; }
+:root[data-sky="dawn"]  { --sky-1: #ffc2a1; --sky-2: #ffd6e8; --sky-3: #ffe2b8; --sky-4: #c9f0dc; }
+:root[data-sky="day"]   { --sky-1: #ffb59a; --sky-2: #cdb4ff; --sky-3: #a8c4ff; --sky-4: #a6ecd2; }
+:root[data-sky="dusk"]  { --sky-1: #ffb07a; --sky-2: #f5a3c7; --sky-3: #c7b0ff; --sky-4: #ffd59a; }
+:root[data-sky="night"] { --sky-1: #d6c8ff; --sky-2: #b9c8ff; --sky-3: #cfe0ff; --sky-4: #e6d4ff; }
+
+/* ---------------------------------------------------------------------------------------------- command bar */
+@property --cmd-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes cmd-spin { to { --cmd-angle: 360deg; } }
+.cmd-shell { background: conic-gradient(from var(--cmd-angle), #ff8a5b, #a77bff, #5b8cff, #2fbf8f, #ff8a5b);
+  animation: cmd-spin 6s linear infinite; box-shadow: 0 30px 80px -30px rgb(167 123 255 / .55), 0 10px 30px -12px rgb(255 138 91 / .35); }
+
+/* ---------------------------------------------------------------------------------------------- prism cards
+   A refracting rainbow follows the cursor across the card while it tilts in 3D. */
+.prism { transform-style: preserve-3d; will-change: transform; }
+.prism > * { transform: translateZ(18px); }
+.prism::before { background: radial-gradient(220px circle at var(--bx, 50%) var(--by, 50%), rgb(255 255 255 / .9), transparent 60%),
+  linear-gradient(115deg, transparent 20%, rgb(255 138 91 / .16) calc(var(--px, 50%) - 18%), rgb(167 123 255 / .18) var(--px, 50%),
+  rgb(91 140 255 / .16) calc(var(--px, 50%) + 18%), transparent 80%) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cmd-shell { animation: none; }
+  .field i { transition: none; }
+}

@@ -1,0 +1,6 @@
+{"question": "What is the difference between supervised and unsupervised learning?", "user": "Saketh", "answerable": true}
+{"question": "How does gradient descent update the weights?", "user": "Saketh", "answerable": true}
+{"question": "What is a confusion matrix used for?", "user": "Saketh", "answerable": true}
+{"question": "Who won the 2011 Cricket World Cup?", "user": "Saketh", "answerable": false}
+{"question": "What is the capital of Australia?", "user": "Saketh", "answerable": false}
+{"question": "How do I bake sourdough bread?", "user": "Saketh", "answerable": false}
