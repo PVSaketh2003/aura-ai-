@@ -91,6 +91,10 @@ class AppSettings(BaseSettings):
     secure_cookies: bool = False  # HTTPS-only cookies; enable in production
     behind_https_proxy: bool = False  # trust X-Forwarded-Proto from the hosting proxy (Render)
 
+    # One-time code required to create the owner account on a fresh public deployment (empty = not required, e.g.
+    # on the Mac). Set it in the hosting dashboard; you read it there, so nobody else can claim a new server first.
+    setup_code: str = ""
+
     # --- Messenger ---
     # SMS delivery for phone verification: "twilio" (Twilio Verify) or "dev" (DEBUG-only local outbox file); "" = off
     sms_backend: str = ""

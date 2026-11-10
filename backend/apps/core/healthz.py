@@ -15,8 +15,8 @@ class HealthzMiddleware:
 
 
 class PublicAdminGuardMiddleware:
-    """Django admin is only for the owner on the Mac itself: on the public hosts (COOKIE_DOMAIN, e.g.
-    *.pvsairamsaketh.in through Cloudflare Tunnel) /admin/ simply doesn't exist."""
+    """Django admin is only reachable from the machine itself (localhost). On every public host (custom domain or the
+    platform's own *.onrender.com address) /admin/ doesn't exist."""
 
     def __init__(self, get_response):
         from config.env import get_settings
@@ -25,8 +25,9 @@ class PublicAdminGuardMiddleware:
 
     def __call__(self, request):
         if self.domain and request.path.startswith("/admin"):
+            # production (COOKIE_DOMAIN set): admin only on the machine itself, never on a public host
             host = request.get_host().split(":")[0]
-            if host == self.domain.lstrip(".") or host.endswith(self.domain):
+            if host not in ("localhost", "127.0.0.1"):
                 from django.http import Http404
                 raise Http404
         return self.get_response(request)

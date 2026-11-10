@@ -24,6 +24,8 @@ services:
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true
+      - key: SETUP_CODE                   # one-time code to create the owner account (read it in the dashboard)
+        generateValue: true
       - key: DJANGO_DEBUG
         value: "false"
       - key: ALLOWED_HOSTS                # API domain, Render URL, and the frontend host (its nginx proxies /api links)

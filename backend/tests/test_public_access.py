@@ -68,3 +68,20 @@ def test_cookie_middleware_is_inert_without_a_cookie_domain(monkeypatch):
 def test_admin_is_not_public_but_works_on_the_mac(public):
     assert public.get("/admin/", HTTP_HOST="api.aura.pvsairamsaketh.in", HTTP_X_FORWARDED_PROTO="https").status_code == 404
     assert public.get("/admin/", HTTP_HOST="localhost").status_code == 302  # → admin login page, as before
+
+
+def test_admin_is_hidden_on_the_platform_address_too(public, settings):
+    settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, ".onrender.com"]
+    assert public.get("/admin/", HTTP_HOST="aura-backend-m52k.onrender.com", HTTP_X_FORWARDED_PROTO="https").status_code == 404
+
+
+def test_fresh_server_needs_the_setup_code(monkeypatch, settings, db):
+    from django.contrib.auth import get_user_model
+    from rest_framework.test import APIClient
+    monkeypatch.setattr(get_settings(), "setup_code", "one-time-code-from-dashboard")
+    c = APIClient()
+    assert c.get("/api/auth/session/").json()["setup_code_required"] is True
+    body = {"username": "owner", "password": "correct-horse-battery-9", "display_name": "Owner"}
+    assert c.post("/api/auth/setup/", {**body, "setup_code": "guess"}, format="json").status_code == 403
+    assert not get_user_model().objects.exists()
+    assert c.post("/api/auth/setup/", {**body, "setup_code": "one-time-code-from-dashboard"}, format="json").status_code == 201

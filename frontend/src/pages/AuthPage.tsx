@@ -17,16 +17,16 @@ function Field({ label, ...p }: { label: string } & React.InputHTMLAttributes<HT
 }
 
 export function AuthPage() {
-  const { setupRequired, login, setup, error: bootError } = useAuth()
+  const { setupRequired, setupCodeRequired, login, setup, error: bootError } = useAuth()
   const [mode, setMode] = useState<'password' | 'phone'>('password')
-  const [f, setF] = useState({ name: '', username: '', password: '' })
+  const [f, setF] = useState({ name: '', username: '', password: '', code: '' })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value })
 
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setErr(''); setBusy(true)
-    try { setupRequired ? await setup(f.username, f.password, f.name) : await login(f.username, f.password) }
+    try { setupRequired ? await setup(f.username, f.password, f.name, f.code) : await login(f.username, f.password) }
     catch (x) { setErr((x as Error).message) } finally { setBusy(false) }
   }
 
@@ -52,6 +52,7 @@ export function AuthPage() {
           {setupRequired && <Field label="Your name" value={f.name} onChange={set('name')} placeholder="What should I call you?" autoFocus />}
           <Field label="Username" value={f.username} onChange={set('username')} autoComplete="username" autoFocus={!setupRequired} required />
           <Field label="Password" type="password" value={f.password} onChange={set('password')} autoComplete={setupRequired ? 'new-password' : 'current-password'} required minLength={8} />
+          {setupRequired && setupCodeRequired && <Field label="Setup code (from your hosting dashboard)" value={f.code} onChange={set('code')} autoComplete="off" required />}
           {(err || bootError) && <p className="text-[13px] text-rose">{err || bootError}</p>}
           <button disabled={busy} className="group flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3.5 text-[14px] font-medium text-white shadow-[0_10px_30px_-10px_rgb(12_12_16/.6)] transition hover:shadow-[0_14px_40px_-10px_rgb(167_123_255/.55)] disabled:opacity-60">
             {busy ? 'One moment…' : setupRequired ? 'Create account' : 'Sign in'}

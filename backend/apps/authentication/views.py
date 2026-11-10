@@ -23,6 +23,7 @@ class Credentials(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(max_length=256, trim_whitespace=False)
     display_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    setup_code = serializers.CharField(max_length=200, required=False, allow_blank=True, trim_whitespace=True)
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -32,8 +33,9 @@ class SessionView(APIView):
 
     def get(self, request):
         u = request.user
+        from config.env import get_settings
         return Response({"authenticated": u.is_authenticated, "user": _user(u) if u.is_authenticated else None,
-                         "setup_required": not User.objects.exists()})
+                         "setup_required": not User.objects.exists(), "setup_code_required": bool(get_settings().setup_code)})
 
 
 @method_decorator(csrf_protect, name="dispatch")  # also for anonymous users: no login CSRF
@@ -44,8 +46,16 @@ class SetupView(APIView):
     throttle_scope = "auth"
 
     def post(self, request):
+        import hmac
+
+        from config.env import get_settings
         data = Credentials(data=request.data)
         data.is_valid(raise_exception=True)
+        code = get_settings().setup_code
+        if code and not hmac.compare_digest(code.encode(), data.validated_data.get("setup_code", "").encode()):
+            audit(None, "auth.setup_denied", data.validated_data["username"])
+            return Response({"detail": "That setup code isn't right. Find it in your hosting dashboard (SETUP_CODE)."},
+                            status=status.HTTP_403_FORBIDDEN)
         with transaction.atomic():
             if User.objects.select_for_update().exists():
                 return Response({"detail": "Setup already completed."}, status=status.HTTP_403_FORBIDDEN)
