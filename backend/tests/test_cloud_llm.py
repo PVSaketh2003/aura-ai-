@@ -22,6 +22,8 @@ class Fake(BaseHTTPRequestHandler):
         if self.path.endswith("/embeddings"):
             data = [{"index": i, "embedding": [3.0, 4.0]} for i, _ in enumerate(body["input"])]
             return self._json({"data": data})
+        if "stream_options" in body and self.path.startswith("/strict"):  # a provider that rejects stream_options
+            self.send_response(400); self.end_headers(); return
         fmt = (body.get("response_format") or {}).get("type")
         if fmt == "json_schema":  # this provider only supports json_object
             self.send_response(400); self.end_headers(); return
@@ -102,3 +104,10 @@ def test_without_local_speech_voice_fails_clearly_and_nothing_heavy_loads(monkey
     from apps.agent.apps import warm_all
     warm_all()
     assert loaded == []
+
+
+def test_providers_that_reject_optional_fields_still_work(cloud, monkeypatch):
+    from services.llm.ollama import OpenAICompatClient
+    c = OpenAICompatClient(base_url=get_settings().llm_base_url.replace("/v1", "/strict/v1"))
+    text, _ = c.stream_chat("m", [{"role": "user", "content": "hi"}])
+    assert text == "Hello from the cloud" and "stream_options" not in seen[-1]["body"]

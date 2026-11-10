@@ -199,6 +199,9 @@ class OpenAICompatClient(OllamaClient):
                 body["response_format"] = {"type": "json_object"}
                 body["messages"] = messages + [{"role": "system", "content": "Reply with JSON matching this schema: " + json.dumps(json_schema)[:6000]}]
                 code = run(body)
+            if code == 400 and not out:  # some providers reject optional fields: last try without them
+                body.pop("stream_options", None)
+                code = run(body)
             if code != 200:
                 raise LLMUnavailable(f"LLM API returned HTTP {code}.")
         except httpx.HTTPError as e:

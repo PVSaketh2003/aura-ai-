@@ -226,6 +226,7 @@ Render (render.yaml, autoDeployTrigger: checksPass, per-folder buildFilter)
 | `MEDIA_ROOT`, `CHROMA_PATH` | `/var/data/media`, `/var/data/app/chroma` (persistent disk) |
 | `LLM_PROVIDER` | `openai` |
 | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | your provider, e.g. `https://api.openai.com/v1`, your key, `gpt-4o-mini` |
+| *(free option)* | Google Gemini's OpenAI-compatible API: `LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `LLM_API_KEY=` a key from aistudio.google.com, `LLM_MODEL=gemini-2.5-flash`, `EMBEDDING_MODEL=gemini-embedding-001`, `EMBEDDING_DIM=3072` |
 | `EMBEDDING_MODEL`, `EMBEDDING_DIM` | e.g. `text-embedding-3-small`, `1536` (`EMBEDDING_BASE_URL`/`_API_KEY` default to the LLM ones) |
 | `LOCAL_SPEECH` | `false` (see above) |
 | `SMS_BACKEND`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID` | optional: `twilio` + Twilio Verify credentials enable phone sign-up |
