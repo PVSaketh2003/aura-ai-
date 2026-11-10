@@ -31,6 +31,15 @@ class AppSettings(BaseSettings):
     ollama_base_url: str = "http://127.0.0.1:11434"
     # Bearer token for a remote/hosted Ollama endpoint (e.g. Ollama behind an authenticating proxy). Empty = none.
     ollama_api_key: str = ""
+    # "ollama" (default: local Ollama, the Mac setup) or "openai": any OpenAI-compatible cloud API (OpenAI, Groq,
+    # OpenRouter, Together, …) — used where Ollama can't run, e.g. on Render. Key and URL come only from the environment.
+    llm_provider: str = "ollama"
+    llm_base_url: str = ""          # e.g. https://api.groq.com/openai/v1
+    llm_api_key: str = ""
+    # Embeddings follow the same switch; by default they reuse the LLM provider's URL and key.
+    embedding_provider: str = ""    # "" = same as llm_provider
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
     llm_model: str = "gemma3:4b"  # best Indic-language quality + ~2x speed on a 16 GB Mac (vs llama3.1:8b)
     llm_fallback_models: CSV = []
     llm_timeout_seconds: float = 180.0
@@ -56,6 +65,9 @@ class AppSettings(BaseSettings):
     # int8 encoder: 1.7 GB instead of 2.7 GB RAM, 30% faster, same CER (evaluation/asr/README.md). Built once from the
     # downloaded fp32 weights into data/models/indic-conformer-int8/ (needs ~3 GB free disk while building).
     indic_int8: bool = True
+    # Local speech models (Whisper, IndicConformer, VoxLingua, Kokoro TTS) need ~3–4 GB RAM. Off on small cloud
+    # instances (Render 512 MB): voice input then answers with a clear message and replies are text-only.
+    local_speech: bool = True
     model_idle_unload_seconds: int = 600
 
     # --- Retrieval (defaults are overridden by data/retrieval_calibration.json when calibrated) ---

@@ -39,6 +39,9 @@ class Segment:
 
 
 def engine_for(lang: str) -> tuple[str, str]:
+    from config.env import get_settings
+    if not get_settings().local_speech:
+        raise TTSError("Spoken answers aren't available on this server (LOCAL_SPEECH is off). The answer is shown as text.")
     if lang in KOKORO:
         return "kokoro", "Kokoro-82M"
     if lang in MMS:

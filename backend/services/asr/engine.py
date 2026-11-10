@@ -133,6 +133,8 @@ def _whisper():
 def warm() -> bool:
     """Load Whisper in a background thread if it isn't loaded yet. Returns True if a load was started."""
     import threading
+    if not get_settings().local_speech:
+        return False
     key = "asr:whisper-mlx" if _mlx_ok() else "asr:whisper-large-v3-turbo"
     if key in registry.loaded():
         _whisper()  # touch: resets the idle timer
@@ -440,6 +442,9 @@ def transcribe(src: Path, language: str = "auto", hints: list[str] | None = None
     {"vocabulary": {lang: [words]}, "corrections": {lang: [[wrong, right, n]]}} (apps.speech.free_talk.personal_model)."""
     personal = personal or {}
     import math
+    if not get_settings().local_speech:
+        raise ASRError("Voice input isn't available on this server yet (the speech models need a larger instance). "
+                       "Please type your message.")
     t0 = time.perf_counter()
     selected = language or "auto"
     wav = to_wav16k(src)

@@ -71,6 +71,9 @@ def prewarm_chat_model() -> None:
     import httpx
     from services.llm.ollama import auth_headers
 
+    if get_settings().llm_provider.lower() == "openai":
+        return  # cloud API: nothing to preload
+
     def go():
         s = get_settings()
         try:

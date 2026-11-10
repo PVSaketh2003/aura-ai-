@@ -160,64 +160,80 @@ is copied for you to send), push notifications when the browser is closed (deskt
 ## Deployment on Render (aura.pvsairamsaketh.in)
 
 ```
-git push ─► GitHub Actions checks: backend tests (Postgres+Redis) · frontend lint/types/build · Docker builds
-                    │ all green
-                    ▼
-Render (render.yaml) ─► rebuilds only the service whose folder changed (buildFilter), only after checks pass
-   aura-frontend  https://aura.pvsairamsaketh.in       nginx + React build   (frontend/Dockerfile)
-   aura-backend   https://api.aura.pvsairamsaketh.in   Daphne + Django       (backend/Dockerfile, disk /var/data)
-   aura-db        PostgreSQL 16 (private)      aura-redis  Key Value for Channels (private)
+git push ─► GitHub Actions: backend tests (Postgres+Redis) · frontend lint/types/build · Docker builds
+                 │ all green
+                 ▼
+Render (render.yaml, autoDeployTrigger: checksPass, per-folder buildFilter)
+   aura-frontend  https://aura.pvsairamsaketh.in       nginx + React build   frontend/Dockerfile   (free)
+   aura-backend   https://api.aura.pvsairamsaketh.in   Daphne + Django       backend/Dockerfile    (starter + 5 GB disk)
+   aura-db        PostgreSQL 16 (private)              aura-redis  Key Value for Channels (free, private)
 ```
 
-* The browser calls `https://api.aura.pvsairamsaketh.in` directly (REST + `wss://` WebSockets), using `VITE_API_URL`
-  baked into the build. The session/CSRF cookies are set for `.pvsairamsaketh.in`, so one login works on both
-  subdomains; CORS + CSRF trust exactly `https://aura.pvsairamsaketh.in`.
-* `/api/...` links rendered into the page (images, voice notes, files) are served same-origin by the frontend's nginx,
-  which forwards them over Render's private network to the backend (`BACKEND_HOSTPORT` from the Blueprint).
-* Liveness: `/healthz` on both services (no DB). Readiness with DB + Redis: `https://api.aura.pvsairamsaketh.in/api/health/`.
-* Migrations run on every backend start (`docker-entrypoint.sh`); they only add, never drop data.
+* The browser calls the API host directly: REST over HTTPS and `wss://` WebSockets (`VITE_API_URL`, built into the
+  bundle). Media links in the page (images, voice notes, files, spoken answers) are pointed at the API host too.
+* Login across subdomains: over HTTPS on `*.pvsairamsaketh.in` the session/CSRF cookies get `Domain=.pvsairamsaketh.in`,
+  `Secure`, `HttpOnly` (session) and `SameSite=Lax`. `aura.` and `api.aura.` are the same *site*, so Lax is correct
+  (SameSite=None isn't needed). CORS and CSRF trust exactly `https://aura.pvsairamsaketh.in`; CSRF stays on, also for
+  sign-in. On localhost the cookies stay plain, so local development is unchanged (`apps/core/cookies.py`).
+* `/healthz` on both services is the liveness probe; `https://api.aura.pvsairamsaketh.in/api/health/` checks the
+  database and Redis. Migrations run at every backend start and only add tables or columns.
+
+**What runs differently on Render (and how to get it back)**
+
+| Local Mac feature | On Render | To restore |
+|---|---|---|
+| Ollama LLM (gemma3:4b) + qwen3 embeddings | `LLM_PROVIDER=openai`: any OpenAI-compatible API for chat **and** embeddings | — (set the provider variables) |
+| Voice in/out (Whisper, IndicConformer, VoxLingua, Kokoro) | `LOCAL_SPEECH=false`: voice input asks you to type; replies are text | Backend plan **pro** (4 GB) + `LOCAL_SPEECH=true` + `HF_TOKEN` |
+| MLX Whisper on the Apple GPU | not available in Linux containers | CPU faster-whisper is used automatically when speech is on |
+| Local Mac Agent (load PDFs from your Mac) | needs the agent on a Mac that can reach the API | install the agent and point it at `api.aura…` |
+| Your local PDFs, memories, chats | the cloud database starts empty | upload PDFs again in Library (they're re-embedded with the cloud model) |
 
 **Deploy (one time)**
-1. Push to `main` (GitHub Actions starts).
-2. Render → New → **Blueprint** → connect GitHub → `PVSaketh2003/aura-ai-` → Apply. It creates the 4 resources.
-3. Fill the secrets Render asks for (`sync: false`, table below) → the backend deploys.
-4. Each service → Settings → Custom Domains: Render already lists `api.aura.pvsairamsaketh.in` (backend) and
-   `aura.pvsairamsaketh.in` (frontend) from the Blueprint and shows the target for each.
-5. GoDaddy → `pvsairamsaketh.in` → DNS → Add records:
-   | Type | Name | Value | TTL |
+1. Push to `main`.
+2. Render → **New → Blueprint** → connect GitHub → `PVSaketh2003/aura-ai-` → it reads `render.yaml` → enter the
+   `sync: false` values (table below) → **Apply**. Render asks for a card: the backend (starter + disk) and Postgres are
+   paid, about **US$14/month** in total; the frontend and Key Value are free.
+3. Wait for both services to be **Live**. Each one's **Settings → Custom Domains** already lists its domain from the
+   Blueprint, together with the exact target Render wants.
+4. Cloudflare → `pvsairamsaketh.in` → **DNS → Records** → *Add record* (leave every existing record alone, including
+   the root `A` record and `www` used by the Vercel site, and all email records):
+
+   | Type | Name | Target (copy it from Render) | Proxy status |
    |---|---|---|---|
-   | CNAME | `aura` | `aura-frontend.onrender.com` (exactly as shown by Render) | 1 hour |
-   | CNAME | `api.aura` | `aura-backend.onrender.com` (exactly as shown by Render) | 1 hour |
-   Then press **Verify** for each domain in Render; certificates are issued automatically.
-6. GitHub → Actions → CI/CD → Run workflow → `smoke_test` ✓ to check the live site.
+   | CNAME | `aura` | the target Render shows for **aura-frontend** (normally `aura-frontend.onrender.com`) | **DNS only** (grey) |
+   | CNAME | `api.aura` | the target Render shows for **aura-backend** (normally `aura-backend.onrender.com`) | **DNS only** (grey) |
 
-**Environment variables (aura-backend)**
+   If a CNAME `aura` already exists, edit it instead of adding a second one.
+5. In Render press **Verify** on each domain; certificates are issued in a few minutes.
+6. Optional, after both show *Certificate issued*: switch the two records to **Proxied** (orange) and set Cloudflare
+   **SSL/TLS → Overview → Full (strict)**. Render supports this; keep DNS only if anything misbehaves.
+7. GitHub → Actions → CI/CD → **Run workflow** → `smoke_test` checks the live site.
 
-| Variable | Value | Notes |
-|---|---|---|
-| `DJANGO_SECRET_KEY` | generated by Render | never commit |
-| `DJANGO_DEBUG` | `false` | |
-| `ALLOWED_HOSTS` | `api.aura.pvsairamsaketh.in,aura.pvsairamsaketh.in,.onrender.com` | |
-| `FRONTEND_ORIGINS` | `https://aura.pvsairamsaketh.in` | used for CORS allowed origins **and** CSRF trusted origins |
-| `COOKIE_DOMAIN` | `.pvsairamsaketh.in` | shared login across subdomains |
-| `SECURE_COOKIES`, `BEHIND_HTTPS_PROXY` | `true` | HTTPS-only cookies; trust Render's TLS proxy |
-| `DATABASE_URL`, `REDIS_URL` | from the Blueprint | private network |
-| `MEDIA_ROOT`, `CHROMA_PATH` | `/var/data/media`, `/var/data/app/chroma` | persistent disk |
-| `OLLAMA_BASE_URL` | **you provide** | an Ollama server reachable from Render; without it chat answers fail |
-| `OLLAMA_API_KEY` | optional | bearer token if that Ollama is behind authentication |
-| `LLM_MODEL`, `EMBEDDING_MODEL` | `gemma3:4b`, `qwen3-embedding:4b` | must exist on that Ollama |
-| `HF_TOKEN` | optional | Hugging Face **read** token with access to IndicConformer (Telugu/Hindi speech) |
-| `SMS_BACKEND` + `TWILIO_*` | optional | `twilio` enables phone sign-up; empty disables it (the dev outbox never runs in production) |
-| `WEBRTC_ICE_SERVERS` | STUN by default | add a TURN server for calls across strict networks |
+**Environment variables**
 
-**aura-frontend:** `VITE_API_URL=https://api.aura.pvsairamsaketh.in` (public, build-time) and `BACKEND_HOSTPORT`
-(from the Blueprint). Nothing secret is ever given to the frontend.
+*aura-backend* (Render → aura-backend → Environment). Secrets are typed here only, never committed:
 
-**Costs and limits:** the backend needs a paid instance (Standard, 2 GB, for chat/RAG/messenger; Pro or larger for the
-local speech models) plus the persistent disk and Postgres. Render has no GPU and no Ollama: speech runs on CPU
-(faster-whisper + IndicConformer, slower than on the Mac) and the LLM must be an Ollama endpoint you provide. Login
-works on the custom domains (the shared cookie needs `*.pvsairamsaketh.in`), not on the raw `*.onrender.com` URLs.
-Cloud data (PDFs, memories, chats) is separate from this Mac's data.
+| Variable | Value |
+|---|---|
+| `DJANGO_SECRET_KEY` | generated by Render |
+| `DJANGO_DEBUG` | `false` |
+| `ALLOWED_HOSTS` | `api.aura.pvsairamsaketh.in,aura.pvsairamsaketh.in,.onrender.com` |
+| `FRONTEND_ORIGINS` | `https://aura.pvsairamsaketh.in` (used for both CORS allowed origins and CSRF trusted origins) |
+| `COOKIE_DOMAIN` | `.pvsairamsaketh.in` |
+| `SECURE_COOKIES`, `BEHIND_HTTPS_PROXY` | `true` |
+| `DATABASE_URL` | from `aura-db` (internal URL) |
+| `REDIS_URL` | from `aura-redis` (internal URL) |
+| `MEDIA_ROOT`, `CHROMA_PATH` | `/var/data/media`, `/var/data/app/chroma` (persistent disk) |
+| `LLM_PROVIDER` | `openai` |
+| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | your provider, e.g. `https://api.openai.com/v1`, your key, `gpt-4o-mini` |
+| `EMBEDDING_MODEL`, `EMBEDDING_DIM` | e.g. `text-embedding-3-small`, `1536` (`EMBEDDING_BASE_URL`/`_API_KEY` default to the LLM ones) |
+| `LOCAL_SPEECH` | `false` (see above) |
+| `SMS_BACKEND`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID` | optional: `twilio` + Twilio Verify credentials enable phone sign-up |
+| `WEBRTC_ICE_SERVERS` | STUN by default; add a TURN server for calls across strict networks |
+| `PORT` | set by Render automatically |
+
+*aura-frontend* (public, built into the JavaScript): `VITE_API_URL=https://api.aura.pvsairamsaketh.in`. No secrets.
+Render passes it to the Docker build as a build argument.
 
 **Any OS with Docker:** `cp .env.docker.example .env`, set the values, then `docker compose up -d` → http://localhost:8080.
 

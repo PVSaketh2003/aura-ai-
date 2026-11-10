@@ -19,6 +19,10 @@ def warm_all() -> None:
         QwenEmbeddings().embed_query("warm up"); steps.append("embeddings")
     except Exception as e:  # noqa: BLE001
         log.warning("embedding warm-up failed: %s", e)
+    from config.env import get_settings
+    if not get_settings().local_speech:
+        log.info("warm-up done: %s (local speech disabled: LOCAL_SPEECH=false)", ", ".join(steps))
+        return
     try:
         from services.tts.engine import _synth
         _synth("Ready.", "en", None, 1.0); steps.append("kokoro")

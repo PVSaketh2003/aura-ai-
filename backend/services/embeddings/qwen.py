@@ -63,7 +63,14 @@ class QwenEmbeddings(Embeddings):
         self.model = s.embedding_model
         self.dim = s.embedding_dim
         self.batch = s.embedding_batch_size
-        self.url = s.ollama_base_url.rstrip("/") + "/api/embed"
+        prov = (s.embedding_provider or s.llm_provider).lower()
+        self.cloud = prov == "openai"
+        if self.cloud:  # OpenAI-compatible /embeddings (on Render, where Ollama can't run)
+            base = (s.embedding_base_url or s.llm_base_url).rstrip("/")
+            key = s.embedding_api_key or s.llm_api_key
+            self.url, self.headers = base + "/embeddings", ({"Authorization": f"Bearer {key}"} if key else {})
+        else:
+            self.url, self.headers = s.ollama_base_url.rstrip("/") + "/api/embed", auth_headers()
         self.instruction = instruction
         self.last_stats: dict = {}
 
@@ -74,11 +81,12 @@ class QwenEmbeddings(Embeddings):
             batch = [t[:8000] for t in texts[i:i + self.batch]]
             for attempt in range(attempts):
                 try:
-                    r = httpx.post(self.url, json={"model": self.model, "input": batch, "keep_alive": keep_alive}, timeout=300, headers=auth_headers())
-                    if r.status_code == 404 or "not found" in r.text[:200].lower():
+                    body = {"model": self.model, "input": batch} if self.cloud else {"model": self.model, "input": batch, "keep_alive": keep_alive}
+                    r = httpx.post(self.url, json=body, timeout=300, headers=self.headers)
+                    if not self.cloud and (r.status_code == 404 or "not found" in r.text[:200].lower()):
                         raise EmbeddingError(f"Embedding model '{self.model}' is not installed. Run: ollama pull {self.model}")
                     r.raise_for_status()
-                    vecs = r.json()["embeddings"]
+                    vecs = [d["embedding"] for d in sorted(r.json()["data"], key=lambda d: d.get("index", 0))] if self.cloud else r.json()["embeddings"]
                     break
                 except EmbeddingError:
                     raise
@@ -98,6 +106,8 @@ class QwenEmbeddings(Embeddings):
         together push the system into swap and slow both down by an order of magnitude; the chat model
         reloads from disk in seconds when the next question arrives."""
         s = get_settings()
+        if self.cloud or s.llm_provider.lower() == "openai":
+            return  # nothing to unload on a cloud API
         try:
             httpx.post(f"{s.ollama_base_url.rstrip('/')}/api/generate", json={"model": s.llm_model, "keep_alive": 0}, timeout=15, headers=auth_headers())
         except httpx.HTTPError:
