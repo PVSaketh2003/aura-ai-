@@ -29,9 +29,9 @@ services:
       - key: DJANGO_DEBUG
         value: "false"
       - key: ALLOWED_HOSTS                # API domain, Render URL, and the frontend host (its nginx proxies /api links)
-        value: api.aura.pvsairamsaketh.in,aura.pvsairamsaketh.in,akku.pvsairamsaketh.in,.onrender.com
+        value: api.aura.pvsairamsaketh.in,aura.pvsairamsaketh.in,.onrender.com
       - key: FRONTEND_ORIGINS             # CORS + CSRF trusted origins
-        value: https://aura.pvsairamsaketh.in,https://akku.pvsairamsaketh.in
+        value: https://aura.pvsairamsaketh.in
       - key: COOKIE_DOMAIN                # one login across aura.… and api.aura.…
         value: .pvsairamsaketh.in
       - key: SECURE_COOKIES
@@ -88,7 +88,7 @@ services:
     buildFilter:
       paths: ["frontend/**"]
     domains:
-      - akku.pvsairamsaketh.in             # free workspaces get 2 custom domains: akku (app) + api.aura (API)
+      - aura.pvsairamsaketh.in             # free workspaces get 2 custom domains: aura (app) + api.aura (API)
     envVars:
       - key: VITE_API_URL                 # public: baked into the JS at build time (no secrets here)
         value: https://api.aura.pvsairamsaketh.in
