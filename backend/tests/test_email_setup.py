@@ -101,6 +101,65 @@ def test_delivery_failure_is_reported_without_leaking_details(monkeypatch, caplo
     def boom(*a, **k):
         raise OSError("connection refused to smtp with password app-password")
     monkeypatch.setattr("django.core.mail.send_mail", boom)
-    with pytest.raises(email_otp.EmailOTPError, match="Couldn't send"):
+    with pytest.raises(email_otp.EmailOTPError, match="Couldn't reach the email server"):
         email_otp.send_code(OWNER, "setup", None)
     assert "app-password" not in caplog.text and not EmailOTP.objects.exists()
+
+
+def test_gmail_api_sends_as_the_gmail_account_over_https(monkeypatch):
+    """EMAIL_PROVIDER=gmail_api: refresh token -> access token (cached) -> Gmail users.messages.send with a MIME
+    message From pvsaketh1@gmail.com. Only Google's two HTTPS endpoints are replaced here."""
+    import base64
+    import email
+
+    import httpx
+    s = get_settings()
+    for k, v in {"email_provider": "gmail_api", "gmail_client_id": "cid", "gmail_client_secret": "csecret",
+                 "gmail_refresh_token": "rtoken", "email_from": "Aura <pvsaketh1@gmail.com>", "owner_emails": [OWNER]}.items():
+        monkeypatch.setattr(s, k, v)
+    email_otp._gmail_token.clear()
+    calls = []
+
+    class R:
+        def __init__(self, code, data):
+            self.status_code, self._d = code, data
+
+        def json(self):
+            return self._d
+
+    def fake_post(url, **kw):
+        calls.append((url, kw))
+        if url.startswith("https://oauth2.googleapis.com/token"):
+            assert kw["data"]["grant_type"] == "refresh_token" and kw["data"]["refresh_token"] == "rtoken"
+            return R(200, {"access_token": "atoken", "expires_in": 3600})
+        assert url == "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+        assert kw["headers"]["Authorization"] == "Bearer atoken"
+        return R(200, {"id": "m1"})
+    monkeypatch.setattr(httpx, "post", fake_post)
+    assert email_otp.enabled()
+    email_otp.send_code(OWNER, "setup", None)
+    email_otp.send_code(OWNER, "setup", None)
+    token_calls = [c for c in calls if "oauth2" in c[0]]
+    sends = [c for c in calls if "gmail.googleapis" in c[0]]
+    assert len(token_calls) == 1 and len(sends) == 2  # access token reused
+    msg = email.message_from_bytes(base64.urlsafe_b64decode(sends[0][1]["json"]["raw"]))
+    assert msg["From"] == "Aura <pvsaketh1@gmail.com>" and msg["To"] == OWNER and "verification code" in msg["Subject"]
+    assert EmailOTP.objects.count() == 2
+
+
+def test_gmail_api_revoked_approval_gives_a_clear_error(monkeypatch):
+    import httpx
+    s = get_settings()
+    for k, v in {"email_provider": "gmail_api", "gmail_client_id": "cid", "gmail_client_secret": "cs", "gmail_refresh_token": "rt"}.items():
+        monkeypatch.setattr(s, k, v)
+    email_otp._gmail_token.clear()
+
+    class R:
+        status_code = 400
+
+        def json(self):
+            return {"error": "invalid_grant"}
+    monkeypatch.setattr(httpx, "post", lambda url, **kw: R())
+    with pytest.raises(email_otp.EmailOTPError, match="gmail_authorize"):
+        email_otp.send_code(OWNER, "setup", None)
+    assert not EmailOTP.objects.exists()

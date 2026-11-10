@@ -103,6 +103,11 @@ class AppSettings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     brevo_api_key: str = ""
+    # Gmail API (EMAIL_PROVIDER=gmail_api): sends as the authorised Gmail account over HTTPS (works where SMTP ports
+    # are blocked). Created once with scripts/gmail_authorize.py; all three are secrets.
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
     owner_emails: CSV = []
 
     # --- Messenger ---

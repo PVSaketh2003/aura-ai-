@@ -4,6 +4,8 @@ Delivery (EMAIL_PROVIDER):
   * "smtp"  — any SMTP server; for Gmail: SMTP_USER = the Gmail address, SMTP_PASSWORD = a Google *App Password*
               (Google Account → Security → 2-Step Verification → App passwords). Never the normal Gmail password.
   * "brevo" — Brevo's HTTPS email API (BREVO_API_KEY), for hosts that block outgoing SMTP ports.
+  * "gmail_api" — Gmail's official API over HTTPS, sending as the authorised Gmail account itself (pvsaketh1@gmail.com).
+              Works where SMTP is blocked (e.g. Render's free plan). Set up once with scripts/gmail_authorize.py.
 Limits: 3 codes per address per 15 min, 10 per IP per hour, 5 wrong tries per code, 10-minute expiry, single use.
 Codes are never logged and never returned by the API; only an HMAC is stored.
 """
@@ -36,7 +38,8 @@ class EmailOTPError(ValueError):
 def enabled() -> bool:
     s = get_settings()
     return (s.email_provider == "smtp" and bool(s.smtp_user and s.smtp_password)) or \
-           (s.email_provider == "brevo" and bool(s.brevo_api_key))
+           (s.email_provider == "brevo" and bool(s.brevo_api_key)) or \
+           (s.email_provider == "gmail_api" and bool(s.gmail_client_id and s.gmail_client_secret and s.gmail_refresh_token))
 
 
 def normalize(email: str) -> str:
@@ -55,8 +58,48 @@ def _hash(email: str, code: str) -> str:
     return hmac.new(settings.SECRET_KEY.encode(), f"email:{email}:{code}".encode(), hashlib.sha256).hexdigest()
 
 
+_gmail_token: dict = {}
+
+
+def _gmail_access_token() -> str:
+    """Short-lived access token from the long-lived refresh token (cached until shortly before it expires)."""
+    import time
+
+    import httpx
+    if _gmail_token.get("exp", 0) > time.time() + 60:
+        return _gmail_token["value"]
+    s = get_settings()
+    r = httpx.post("https://oauth2.googleapis.com/token", timeout=15, data={
+        "client_id": s.gmail_client_id, "client_secret": s.gmail_client_secret,
+        "refresh_token": s.gmail_refresh_token, "grant_type": "refresh_token"})
+    if r.status_code >= 300:
+        raise EmailOTPError("Gmail authorisation failed. Run scripts/gmail_authorize.py again (the approval may have been revoked).")
+    d = r.json()
+    _gmail_token.update(value=d["access_token"], exp=time.time() + int(d.get("expires_in", 3600)))
+    return _gmail_token["value"]
+
+
+def _gmail_send(to: str, subject: str, text: str) -> None:
+    import base64
+    from email.message import EmailMessage
+
+    import httpx
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = get_settings().email_from, to, subject
+    msg.set_content(text)
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    r = httpx.post("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", timeout=20,
+                   headers={"Authorization": f"Bearer {_gmail_access_token()}"}, json={"raw": raw})
+    if r.status_code == 401:
+        _gmail_token.clear()
+    if r.status_code >= 300:
+        raise EmailOTPError(f"Gmail refused the message (HTTP {r.status_code}).")
+
+
 def _deliver(to: str, subject: str, text: str) -> None:
     s = get_settings()
+    if s.email_provider == "gmail_api":
+        return _gmail_send(to, subject, text)
     if s.email_provider == "brevo":
         import httpx
         name, _, addr = s.email_from.rpartition("<")
@@ -91,6 +134,10 @@ def send_code(email: str, purpose: str, ip: str | None) -> None:
         raise
     except Exception as e:  # noqa: BLE001 — never include the code or credentials in logs
         log.warning("email delivery failed: %s", type(e).__name__)
+        if isinstance(e, (TimeoutError, ConnectionError, OSError)) and get_settings().email_provider == "smtp" \
+                and not hasattr(e, "smtp_code"):
+            raise EmailOTPError("Couldn't reach the email server. This host may block outgoing email ports; "
+                                "switch EMAIL_PROVIDER to an HTTPS email API.") from e
         raise EmailOTPError("Couldn't send the email right now. Please try again in a minute.") from e
     EmailOTP.objects.create(email=email, purpose=purpose, code_hash=_hash(email, code), expires_at=now + TTL, ip=ip)
 

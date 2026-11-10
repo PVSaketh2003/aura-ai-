@@ -66,13 +66,19 @@ services:
       - key: LOCAL_SPEECH                 # speech models need ~4 GB; voice is text-only until a larger plan
         value: "false"
       # --- Owner sign-up by email code (sent from pvsaketh1@gmail.com) ---
-      - key: EMAIL_PROVIDER               # smtp (Gmail App Password) or brevo (HTTPS API)
-        value: smtp
+      - key: EMAIL_PROVIDER               # gmail_api (Gmail over HTTPS; works on the free plan), smtp, or brevo
+        value: gmail_api
       - key: EMAIL_FROM
         value: Aura <pvsaketh1@gmail.com>
       - key: SMTP_USER
         value: pvsaketh1@gmail.com
-      - key: SMTP_PASSWORD                # Google App Password (secret), never the normal Gmail password
+      - key: SMTP_PASSWORD                # only for EMAIL_PROVIDER=smtp (paid instances; free plan blocks SMTP)
+        sync: false
+      - key: GMAIL_CLIENT_ID              # set by scripts/gmail_authorize.py --render
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
         sync: false
       - key: BREVO_API_KEY                # only if EMAIL_PROVIDER=brevo
         sync: false
