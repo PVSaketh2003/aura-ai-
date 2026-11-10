@@ -68,11 +68,15 @@ export function AuthPage() {
             ? <Field label="Email" type="email" value={f.email} onChange={set('email')} autoComplete="email" required disabled={!!codeSentTo} />
             : <Field label={setupRequired ? 'Username' : 'Username or email'} value={f.username} onChange={set('username')} autoComplete="username" autoFocus={!setupRequired} required />}
           <Field label="Password" type="password" value={f.password} onChange={set('password')} autoComplete={setupRequired ? 'new-password' : 'current-password'} required minLength={8} />
-          {setupRequired && setupCodeRequired && !byEmail && <Field label="Setup code (from your hosting dashboard)" value={f.code} onChange={set('code')} autoComplete="off" required />}
+          {setupRequired && setupCodeRequired && !byEmail && (
+            <p className="rounded-2xl border border-line bg-white/70 px-4 py-3 text-[12.5px] leading-relaxed text-mute">
+              Owner sign-up opens as soon as email verification is set up on this server. You'll then get a 6-digit code by email.
+            </p>
+          )}
           {byEmail && codeSentTo && <Field label="6-digit code from your email" value={f.emailCode} onChange={(e) => setF({ ...f, emailCode: e.target.value.replace(/\D/g, '').slice(0, 6) })} inputMode="numeric" autoComplete="one-time-code" autoFocus required />}
           {info && !err && <p className="text-[13px] text-mint">{info} {codeSentTo && <button type="button" className="text-violet underline" onClick={() => { setCodeSentTo(''); setInfo('') }}>Change email / resend</button>}</p>}
           {(err || bootError) && <p className="text-[13px] text-rose">{err || bootError}</p>}
-          <button disabled={busy} className="group flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3.5 text-[14px] font-medium text-white shadow-[0_10px_30px_-10px_rgb(12_12_16/.6)] transition hover:shadow-[0_14px_40px_-10px_rgb(167_123_255/.55)] disabled:opacity-60">
+          <button disabled={busy || (setupRequired && setupCodeRequired && !byEmail)} className="group flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3.5 text-[14px] font-medium text-white shadow-[0_10px_30px_-10px_rgb(12_12_16/.6)] transition hover:shadow-[0_14px_40px_-10px_rgb(167_123_255/.55)] disabled:opacity-60">
             {busy ? 'One moment…' : byEmail && !codeSentTo ? 'Send code' : setupRequired ? 'Create account' : 'Sign in'}
             <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
           </button>
