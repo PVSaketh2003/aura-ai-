@@ -4,7 +4,7 @@ import { useLocation, useOutlet } from 'react-router-dom'
 import { CommandBar } from '../components/CommandBar'
 import { Constellation } from '../components/Constellation'
 import { Rail } from '../components/Rail'
-import { MobileNav, PageErrorBoundary, PageSkeleton } from '../components/Shell'
+import { KeyboardShortcuts, MobileNav, NotificationBell, PageErrorBoundary, PageSkeleton } from '../components/Shell'
 import { TracePanel } from '../components/TracePanel'
 
 /** The background sky follows the time of day — dawn peach, bright day, golden dusk, lavender night (always light). */
@@ -48,6 +48,8 @@ export function AppLayout() {
       <TracePanel />
       <CommandBar />
       <MobileNav />
+      <KeyboardShortcuts />
+      <div className="md:hidden"><NotificationBell compact /></div>
     </div>
   )
 }

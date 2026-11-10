@@ -17,6 +17,7 @@ const MemoryPage = lazy(() => import('./pages/MemoryPage').then((m) => ({ defaul
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const MessengerPage = lazy(() => import('./pages/MessengerPage').then((m) => ({ default: m.MessengerPage })))
 import { MessengerProvider } from './context/MessengerContext'
+import { NotificationProvider } from './context/NotificationContext'
 import { CallOverlay } from './components/messenger/bits'
 
 function Gate() {
@@ -32,6 +33,7 @@ function Gate() {
       ) : (
         <motion.div key="app" className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <AgentProvider>
+           <NotificationProvider>
            <MessengerProvider>
             <Routes>
               <Route element={<AppLayout />}>
@@ -46,6 +48,7 @@ function Gate() {
             </Routes>
             <CallOverlay />
            </MessengerProvider>
+           </NotificationProvider>
           </AgentProvider>
         </motion.div>
       )}

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AgentSocket, type SocketState } from '../services/socket'
 import { mx, type CallRec, type ChatRec, type Me, type Msg } from '../services/messenger'
+import { notify } from './NotificationContext'
 
 /* Messenger state shared by the whole app (so calls ring and unread counts update on every page).
  * Delivery guarantees on the client:
@@ -180,6 +181,10 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
         })
         if (inView) setTimeout(() => markRead(m.chat_id), 30)
         const c = chatsRef.current.find((x) => x.id === m.chat_id)
+        if (!m.mine && !inView && !c?.muted && m.kind === 'text')
+          notify({ kind: 'message', title: c?.kind === 'group' ? `${m.sender_name} · ${c.name}` : m.sender_name,
+                   body: m.deleted ? 'Message' : m.text || (m.attachment ? `Sent ${m.attachment.kind === 'voice' ? 'a voice message' : m.attachment.name}` : ''),
+                   href: `/messenger?s=chats&c=${m.chat_id}` })
         if (!m.mine && !inView && !c?.muted && m.kind !== 'system' && 'Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible')
           new Notification(c?.kind === 'group' ? `${m.sender_name} · ${c.name}` : m.sender_name, { body: m.text || (m.attachment ? `📎 ${m.attachment.name}` : ''), tag: m.chat_id })
         break
@@ -223,6 +228,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
         } else if (['ended', 'missed', 'declined', 'failed'].includes(e.state)) {
           closePeer()
           const label = e.state === 'declined' ? 'Call declined' : e.state === 'missed' ? (c.phase === 'incoming' ? 'Missed call' : 'No answer') : e.state === 'failed' ? 'Call failed' : 'Call ended'
+          if (e.state === 'missed' && c.phase === 'incoming') notify({ kind: 'call', title: 'Missed call', body: `${c.peerName} · ${c.call.video ? 'video' : 'voice'} call`, href: `/messenger?s=calls` })
           setCall({ ...c, phase: 'ended', error: label })
           setTimeout(() => setCall((x) => (x?.call.id === c.call.id ? null : x)), 1800)
         }

@@ -6,7 +6,7 @@ import { NavLink } from 'react-router-dom'
 import { useAgent } from '../context/AgentContext'
 import { cx } from '../utils/format'
 import { StatusDot } from './ui'
-import { AccountMenu } from './Shell'
+import { AccountMenu, NotificationBell } from './Shell'
 
 const NAV = [
   { to: '/', icon: MessageCircle, label: 'Aura AI' },
@@ -45,6 +45,7 @@ export function Rail() {
         <span title={`Live connection: ${socket}`} className="grid h-6 w-6 place-items-center">
           <StatusDot tone={socket === 'open' ? 'ok' : socket === 'connecting' ? 'warn' : 'down'} pulse={socket !== 'open'} />
         </span>
+        <NotificationBell />
         <AccountMenu />
       </div>
     </nav>

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, FileText, Laptop, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
+import { ArrowRight, FileText, LayoutGrid, Laptop, List, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Chip, Eyebrow, StatusDot, useToast } from '../components/ui'
 import { useAgent } from '../context/AgentContext'
@@ -37,6 +37,41 @@ function Row({ d, onOpen, i }: { d: DocumentRec; onOpen: () => void; i: number }
         <span title="Vector index" className="flex items-center gap-1 text-[11px] text-mute"><StatusDot tone={d.index_status === 'completed' ? 'ok' : d.index_status === 'failed' ? 'down' : 'idle'} />index</span>
       </div>
       <div className="w-24 text-right"><StatusPill d={d} /></div>
+    </motion.button>
+  )
+}
+
+/** Grid card: the same real facts as the row, laid out as a document tile. */
+function Card({ d, onOpen, i }: { d: DocumentRec; onOpen: () => void; i: number }) {
+  const ocr = d.inspection?.scanned_pages?.length ?? 0
+  const tables = d.inspection?.table_pages?.length ?? 0
+  return (
+    <motion.button layout initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: Math.min(i, 12) * 0.03 }}
+      whileHover={{ y: -3 }} onClick={onOpen}
+      className="group relative flex flex-col overflow-hidden rounded-[22px] border border-line bg-white/70 p-4 text-left shadow-soft transition hover:border-violet/30 hover:shadow-float">
+      <div className="flex items-start gap-3">
+        <span className="relative grid h-14 w-11 shrink-0 place-items-center rounded-lg border border-line bg-[linear-gradient(160deg,#fff,#f6f2ff)] text-[9px] font-bold tracking-wide text-[#e2612f] shadow-soft">
+          PDF<span className="absolute right-0 top-0 h-3 w-3 rounded-bl-md border-b border-l border-line bg-paper" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="line-clamp-2 text-[14px] font-medium leading-snug text-ink">{d.filename}</div>
+          <div className="mt-1 text-[11.5px] text-mute">{d.source === 'local_agent' ? (d.source_directory || 'Mac') : 'Uploaded'} · {relative(d.created_at)}</div>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        {[['pages', d.page_count], ['chunks', d.chunk_count], ['size', bytes(d.size_bytes)]].map(([k, v]) => (
+          <div key={k as string} className="rounded-xl bg-ink/[.03] py-1.5"><div className="font-mono text-[13px] tabular-nums text-ink">{v || '—'}</div><div className="text-[10px] uppercase tracking-wider text-mute">{k}</div></div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10.5px]">
+        {d.loader && <span className="rounded-full bg-ink/[.04] px-2 py-0.5 font-mono text-mute">{d.loader}</span>}
+        {ocr > 0 && <span className="rounded-full bg-coral/15 px-2 py-0.5 font-medium text-[#c2410c]">OCR · {ocr}</span>}
+        {tables > 0 && <span className="rounded-full bg-sky/15 px-2 py-0.5 font-medium text-[#2f6bff]">{tables} tables</span>}
+        <span className="ml-auto flex items-center gap-2 text-mute">
+          <span className="flex items-center gap-1"><StatusDot tone={d.embedding_status === 'completed' ? 'ok' : d.embedding_status === 'failed' ? 'down' : 'idle'} />emb</span>
+          <span className="flex items-center gap-1"><StatusDot tone={d.index_status === 'completed' ? 'ok' : d.index_status === 'failed' ? 'down' : 'idle'} />index</span>
+        </span>
+      </div>
+      <div className="mt-3 border-t border-line pt-2.5"><StatusPill d={d} /></div>
     </motion.button>
   )
 }
@@ -134,6 +169,8 @@ export function LibraryPage() {
   const [ask, setAsk] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
+  const [view, setViewState] = useState<'list' | 'grid'>(() => { try { return localStorage.getItem('aura.library.view') === 'grid' ? 'grid' : 'list' } catch { return 'list' } })
+  const setView = (v: 'list' | 'grid') => { setViewState(v); try { localStorage.setItem('aura.library.view', v) } catch { /* private mode */ } }
   const file = useRef<HTMLInputElement>(null)
   const myRuns = useRef(new Set<string>())
 
@@ -223,12 +260,20 @@ export function LibraryPage() {
 
         <div className="mt-10 flex items-center justify-between">
           <Eyebrow>{docs?.length ?? 0} documents</Eyebrow>
-          <label className="flex items-center gap-2 rounded-full border border-line bg-white/60 px-3 py-1.5 text-[13px]">
-            <Search size={13} className="text-mute" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter" className="w-36 bg-transparent outline-none placeholder:text-faint" />
-          </label>
+          <div className="flex items-center gap-2">
+            <div role="group" aria-label="View" className="flex rounded-full border border-line bg-white/60 p-0.5">
+              {([['list', List], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
+                <button key={v} onClick={() => setView(v)} aria-pressed={view === v} aria-label={`${v} view`}
+                  className={view === v ? 'grid h-7 w-7 place-items-center rounded-full bg-ink text-white' : 'grid h-7 w-7 place-items-center rounded-full text-mute hover:text-ink'}><Icon size={14} /></button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 rounded-full border border-line bg-white/60 px-3 py-1.5 text-[13px]">
+              <Search size={13} className="text-mute" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter" aria-label="Filter documents" className="w-28 bg-transparent outline-none placeholder:text-faint sm:w-36" />
+            </label>
+          </div>
         </div>
-        <div className="mt-2 border-t border-line">
-          {docs?.map((d, i) => <Row key={d.id} d={d} i={i} onOpen={() => setOpen(d.id)} />)}
+        <div className={view === 'grid' ? 'mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3' : 'mt-2 border-t border-line'}>
+          {docs?.map((d, i) => view === 'grid' ? <Card key={d.id} d={d} i={i} onOpen={() => setOpen(d.id)} /> : <Row key={d.id} d={d} i={i} onOpen={() => setOpen(d.id)} />)}
           {docs && !docs.length && (
             <div className="py-20 text-center">
               <p className="font-serif text-[26px] text-ink">{q ? 'No matches' : 'Nothing here yet'}</p>

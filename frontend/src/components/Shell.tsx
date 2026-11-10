@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from 'motion/react'
 import {
-  AudioLines, Brain, Command, LibraryBig, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Orbit, RotateCcw,
-  SlidersHorizontal, X,
+  AlertTriangle, AudioLines, Bell, Brain, Command, FileCheck2, LibraryBig, LogOut, MessageCircle, MessagesSquare, MoreHorizontal,
+  Orbit, PhoneMissed, RotateCcw, SlidersHorizontal, X,
 } from 'lucide-react'
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useMessenger } from '../context/MessengerContext'
-import { cx } from '../utils/format'
+import { cx, relative } from '../utils/format'
+import { useNotifications, type AuraNotification } from '../context/NotificationContext'
 
 /* ---------------------------------------------------------------------------------------------- error boundary */
 /** One failing page never takes the whole app down: the rest of Aura keeps working and the page can be retried. */
@@ -146,6 +147,7 @@ export function MobileNav() {
                   <Icon size={18} /> {label}
                 </NavLink>
               ))}
+              <NotificationsRow onOpen={() => setMore(false)} />
               <button onClick={() => { setMore(false); window.dispatchEvent(new Event('aura:command')) }} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-[15px] text-ink-2"><Command size={18} /> Search everything</button>
               <button onClick={logout} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-[15px] text-rose"><LogOut size={18} /> Sign out</button>
             </motion.div>
@@ -153,5 +155,133 @@ export function MobileNav() {
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+/* ------------------------------------------------------------------------------------------ notifications */
+export function NotificationBell({ compact = false }: { compact?: boolean }) {
+  const { items, unread, markAllRead, clear, markRead } = useNotifications()
+  const [open, setOpen] = useState(false)
+  const nav = useNavigate()
+  useEffect(() => {
+    const o = () => setOpen(true)
+    window.addEventListener('aura:notifications', o)
+    if (!open) return () => window.removeEventListener('aura:notifications', o)
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('keydown', k)
+    return () => { window.removeEventListener('keydown', k); window.removeEventListener('aura:notifications', o) }
+  }, [open])
+  const icon = (k: AuraNotification['kind']) => ({ document: <FileCheck2 size={15} className="text-mint" />, message: <MessagesSquare size={15} className="text-violet" />,
+    call: <PhoneMissed size={15} className="text-rose" />, error: <AlertTriangle size={15} className="text-rose" /> }[k])
+  return (
+    <>
+      {!compact && (
+        <button onClick={() => setOpen(true)} aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
+          className="relative grid h-9 w-9 place-items-center rounded-xl text-mute transition hover:bg-ink/[.05] hover:text-ink">
+          <Bell size={17} strokeWidth={1.7} />
+          {unread > 0 && <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[9px] font-semibold text-white">{unread > 9 ? '9+' : unread}</span>}
+        </button>
+      )}
+      <AnimatePresence>
+        {open && (
+          <motion.div className="fixed inset-0 z-[60] bg-ink/10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)}>
+            <motion.aside role="dialog" aria-label="Notifications" onClick={(e) => e.stopPropagation()}
+              initial={{ x: -24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -24, opacity: 0 }} transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+              className="absolute inset-y-3 left-3 flex w-[min(380px,calc(100vw-24px))] flex-col rounded-[26px] border border-line bg-paper shadow-float md:left-[84px]">
+              <div className="flex items-center gap-2 px-5 pb-3 pt-5">
+                <h2 className="font-serif text-[26px] leading-none text-ink">Notifications</h2>
+                <button onClick={() => setOpen(false)} aria-label="Close" className="ml-auto grid h-8 w-8 place-items-center rounded-full text-mute hover:bg-ink/5"><X size={16} /></button>
+              </div>
+              {items.length > 0 && (
+                <div className="flex gap-3 px-5 pb-2 text-[12px]">
+                  <button onClick={markAllRead} disabled={!unread} className="text-violet disabled:text-faint">Mark all read</button>
+                  <button onClick={clear} className="text-mute hover:text-ink">Clear</button>
+                </div>
+              )}
+              <div className="scroll-quiet flex-1 overflow-y-auto px-2 pb-3">
+                {items.length === 0 && (
+                  <div className="px-6 py-16 text-center">
+                    <Bell size={22} className="mx-auto text-faint" />
+                    <p className="mt-3 text-[13px] leading-relaxed text-mute">Nothing yet. Finished documents, new messages and missed calls appear here.</p>
+                  </div>
+                )}
+                {items.map((n) => (
+                  <button key={n.id} onClick={() => { markRead(n.id); setOpen(false); if (n.href) nav(n.href) }}
+                    className={cx('flex w-full gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-ink/[.04]', !n.read && 'bg-violet/[.05]')}>
+                    <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white shadow-soft">{icon(n.kind)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2"><span className="truncate text-[13.5px] font-medium text-ink">{n.title}</span>
+                        <span className="ml-auto shrink-0 text-[10.5px] text-mute">{relative(new Date(n.at).toISOString())}</span></span>
+                      <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-snug text-ink-2">{n.body}</span>
+                    </span>
+                    {!n.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-coral" aria-label="unread" />}
+                  </button>
+                ))}
+              </div>
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+/* ---------------------------------------------------------------------------------------- keyboard shortcuts */
+const SHORTCUTS: [string, string][] = [
+  ['⌘ K', 'Command bar: go anywhere, search everything'], ['g  c', 'Aura AI chat'], ['g  m', 'Messenger'], ['g  l', 'Library'],
+  ['g  y', 'Memory'], ['g  k', 'Knowledge galaxy'], ['g  v', 'Train my voice'], ['g  s', 'Settings'], ['g  n', 'Notifications'], ['?', 'This help'],
+]
+const GO: Record<string, string> = { c: '/', m: '/messenger', l: '/library', y: '/memory', k: '/galaxy', v: '/voice', s: '/settings' }
+
+/** Two-key navigation (g then a letter) and a "?" cheat sheet. Ignored while typing in a field. */
+export function KeyboardShortcuts() {
+  const nav = useNavigate()
+  const [help, setHelp] = useState(false)
+  useEffect(() => {
+    let pending = 0
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement
+      if (e.metaKey || e.ctrlKey || e.altKey || t?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName ?? '')) return
+      if (e.key === 'Escape') { setHelp(false); return }
+      if (e.key === '?') { e.preventDefault(); setHelp((h) => !h); return }
+      if (e.key === 'g') { pending = Date.now(); return }
+      if (pending && Date.now() - pending < 1200) {
+        pending = 0
+        if (e.key === 'n') { window.dispatchEvent(new Event('aura:notifications')); return }
+        if (GO[e.key]) { e.preventDefault(); nav(GO[e.key]) }
+      }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [nav])
+  return (
+    <AnimatePresence>
+      {help && (
+        <motion.div className="fixed inset-0 z-[70] grid place-items-center bg-ink/15 p-4 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setHelp(false)}>
+          <motion.div role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()} initial={{ scale: 0.96, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.97, opacity: 0 }}
+            className="w-full max-w-[420px] rounded-[26px] border border-line bg-paper p-6 shadow-float">
+            <div className="flex items-center"><h2 className="font-serif text-[26px] text-ink">Keyboard shortcuts</h2>
+              <button onClick={() => setHelp(false)} aria-label="Close" className="ml-auto grid h-8 w-8 place-items-center rounded-full text-mute hover:bg-ink/5"><X size={16} /></button></div>
+            <div className="mt-4 space-y-1.5">
+              {SHORTCUTS.map(([keys, label]) => (
+                <div key={keys} className="flex items-center gap-3 text-[13.5px] text-ink-2">
+                  <span className="flex gap-1">{keys.split('  ').map((x) => <kbd key={x} className="min-w-7 rounded-lg border border-line bg-white px-2 py-0.5 text-center font-mono text-[11.5px] text-ink shadow-soft">{x}</kbd>)}</span>
+                  <span>{label}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+function NotificationsRow({ onOpen }: { onOpen: () => void }) {
+  const { unread } = useNotifications()
+  return (
+    <button onClick={() => { onOpen(); window.dispatchEvent(new Event('aura:notifications')) }} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-[15px] text-ink-2">
+      <Bell size={18} /> Notifications {unread > 0 && <span className="ml-auto rounded-full bg-coral px-2 text-[11px] font-semibold text-white">{unread}</span>}
+    </button>
   )
 }
