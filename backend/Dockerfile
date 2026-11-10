@@ -21,12 +21,14 @@ RUN TORCH=$(grep -E '^torch==' requirements.txt | cut -d= -f3) && \
     pip install -r requirements.txt
 
 COPY . .
+# Static files (Django admin) are collected into the image; settings need *a* secret key just to load.
+RUN DJANGO_SECRET_KEY=build-only-not-a-secret-0123456789abcdefghij python manage.py collectstatic --noinput -v 0
 RUN chmod +x docker-entrypoint.sh && useradd --create-home --uid 10001 aura && \
     mkdir -p /var/data && chown -R aura:aura /app /var/data
 USER aura
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -fsS "http://127.0.0.1:${PORT}/api/health/" || exit 1
+    CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["sh", "-c", "daphne -b 0.0.0.0 -p ${PORT} --proxy-headers config.asgi:application"]

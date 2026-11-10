@@ -1,8 +1,8 @@
 /** Where the Aura API lives.
  *  - Local dev / Docker: '' → same origin (Vite or nginx proxies /api and /ws to the backend).
- *  - Production (Vercel): VITE_API_URL=https://api.aura.pvsairamsaketh.in → calls go straight to the API host with the
+ *  - Production (Render): VITE_API_URL=https://api.aura.pvsairamsaketh.in → calls go straight to the API host with the
  *    session cookie (shared across *.pvsairamsaketh.in via COOKIE_DOMAIN on the backend).
- *  Media URLs rendered into the page (<img src="/api/…">) are proxied by the Vercel rewrite in vercel.json. */
+ *  Media URLs rendered into the page (<img src="/api/…">) are proxied by the frontend's nginx to the backend. */
 export const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 
 export const apiUrl = (path: string) => (API_BASE && path.startsWith('/api') ? API_BASE + path : path)

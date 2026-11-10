@@ -1,44 +1,48 @@
-# Aura CI/CD:  test + build  →  Docker images → Docker Hub  →  deploy backend (Render) + frontend (Vercel)  →  smoke test
-# Pull requests run only the CI jobs. Pushes to main run everything; deploys happen only if every test passed.
+# Aura CI/CD
+#
+#   push / PR ─► backend tests (Postgres + Redis)          ┐
+#              ─► frontend lint + types + build            ├─ these are the GitHub checks Render waits for
+#              ─► Docker build of each image that changed  ┘
+#   Render (render.yaml: autoDeployTrigger checksPass + buildFilter) then deploys ONLY the service whose folder
+#   changed, and ONLY if every check above passed. A failed check means no deploy.
+#   Optional: images are also pushed to Docker Hub when DOCKERHUB_USERNAME / DOCKERHUB_TOKEN secrets exist.
+#   Manual: "Run workflow" → smoke_test=true checks the live site.
 name: CI/CD
 
 on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
   workflow_dispatch:
+    inputs:
+      smoke_test: { description: "Check the live production site", type: boolean, default: false }
 
 concurrency: { group: "${{ github.workflow }}-${{ github.ref }}", cancel-in-progress: true }
-
 permissions: { contents: read }
 
-env:
-  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/aura-backend
-  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/aura-frontend
-
 jobs:
-  gate:
-    name: Which deploy targets are configured?
+  changes:
+    name: What changed?
     runs-on: ubuntu-latest
     outputs:
-      docker: ${{ steps.c.outputs.docker }}
-      render: ${{ steps.c.outputs.render }}
-      vercel: ${{ steps.c.outputs.vercel }}
+      backend: ${{ steps.f.outputs.backend }}
+      frontend: ${{ steps.f.outputs.frontend }}
+      dockerhub: ${{ steps.d.outputs.enabled }}
     steps:
-      - id: c
-        env:
-          DH: ${{ secrets.DOCKERHUB_TOKEN }}
-          RH: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-          VT: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          echo "docker=$([ -n "$DH" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "render=$([ -n "$RH" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "vercel=$([ -n "$VT" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          [ -n "$DH" ] || echo "::notice::Docker Hub secrets not set yet: images are not pushed (tests still run)."
-          [ -n "$RH" ] || echo "::notice::Render deploy hook not set yet: backend not deployed."
-          [ -n "$VT" ] || echo "::notice::Vercel token not set yet: frontend not deployed."
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            backend: ['backend/**', '.github/workflows/**']
+            frontend: ['frontend/**', '.github/workflows/**']
+      - id: d
+        env: { DH: "${{ secrets.DOCKERHUB_TOKEN }}" }
+        run: echo "enabled=$([ -n "$DH" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   backend-test:
     name: Backend · tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -67,10 +71,11 @@ jobs:
           TV=$(grep -E '^torchvision==' requirements.txt | cut -d= -f3)
           pip install --index-url https://download.pytorch.org/whl/cpu "torch==$TORCH" "torchaudio==$TA" "torchvision==$TV"
           pip install -r requirements.txt
-      - name: Django checks + migrations are complete
+      - name: Django checks, complete migrations, static files
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
+          python manage.py collectstatic --noinput -v 0
       - name: Tests
         run: python -m pytest -p no:warnings --junitxml=pytest-report.xml
       - uses: actions/upload-artifact@v4
@@ -79,6 +84,8 @@ jobs:
 
   frontend-test:
     name: Frontend · lint, types, build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
     steps:
@@ -91,85 +98,70 @@ jobs:
       - run: npm run build
         env: { VITE_API_URL: "https://api.aura.pvsairamsaketh.in" }
 
-  docker:
-    name: Docker · build & push to Docker Hub
-    needs: [gate, backend-test, frontend-test]
-    if: github.event_name != 'pull_request' && needs.gate.outputs.docker == 'true'
+  docker-backend:
+    name: Docker · backend image
+    needs: [changes, backend-test]
+    if: needs.backend-test.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Free disk space for the backend image
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - if: needs.changes.outputs.dockerhub == 'true' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
         with: { username: "${{ secrets.DOCKERHUB_USERNAME }}", password: "${{ secrets.DOCKERHUB_TOKEN }}" }
-      - name: Backend image
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: backend
-          push: true
           platforms: linux/amd64
-          tags: ${{ env.BACKEND_IMAGE }}:latest,${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          push: ${{ needs.changes.outputs.dockerhub == 'true' && github.event_name != 'pull_request' }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME || 'aura' }}/aura-backend:latest,${{ secrets.DOCKERHUB_USERNAME || 'aura' }}/aura-backend:${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
-      - name: "Frontend image (multi-arch: Intel and Apple Silicon)"
+
+  docker-frontend:
+    name: Docker · frontend image
+    needs: [changes, frontend-test]
+    if: needs.frontend-test.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - if: needs.changes.outputs.dockerhub == 'true' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with: { username: "${{ secrets.DOCKERHUB_USERNAME }}", password: "${{ secrets.DOCKERHUB_TOKEN }}" }
+      - name: "Build (multi-arch: Intel and Apple Silicon)"
         uses: docker/build-push-action@v6
         with:
           context: frontend
-          push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ env.FRONTEND_IMAGE }}:latest,${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          build-args: VITE_API_URL=https://api.aura.pvsairamsaketh.in
+          push: ${{ needs.changes.outputs.dockerhub == 'true' && github.event_name != 'pull_request' }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME || 'aura' }}/aura-frontend:latest,${{ secrets.DOCKERHUB_USERNAME || 'aura' }}/aura-frontend:${{ github.sha }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
-
-  deploy-backend:
-    name: Deploy · backend → Render
-    needs: [gate, docker]
-    if: needs.gate.outputs.render == 'true'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Trigger Render deploy of this exact image
+      - name: The built container serves the app, SPA routes and health on Render's $PORT
         run: |
-          IMG="docker.io/${BACKEND_IMAGE}:${GITHUB_SHA}"
-          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}&imgURL=$(printf %s "$IMG" | jq -sRr @uri)" -o /dev/null
-      - name: Wait until the new backend is healthy
-        run: |
-          for i in $(seq 1 60); do
-            if curl -fsS https://api.aura.pvsairamsaketh.in/api/health/ | grep -q '"ok"'; then echo healthy; exit 0; fi
-            sleep 15
-          done
-          echo "backend did not become healthy in 15 minutes"; exit 1
-
-  deploy-frontend:
-    name: Deploy · frontend → Vercel
-    needs: [gate, backend-test, frontend-test, deploy-backend]
-    if: always() && github.event_name != 'pull_request' && needs.gate.outputs.vercel == 'true' && needs.backend-test.result == 'success' && needs.frontend-test.result == 'success' && needs.deploy-backend.result != 'failure'
-    runs-on: ubuntu-latest
-    environment: production
-    defaults: { run: { working-directory: frontend } }
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "22" }
-      - run: npx --yes vercel@39.3.0 pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      - run: npx --yes vercel@39.3.0 build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env: { VITE_API_URL: "https://api.aura.pvsairamsaketh.in" }
-      - run: npx --yes vercel@39.3.0 deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+          docker buildx build --load -t aura-frontend:test --build-arg VITE_API_URL=https://api.aura.pvsairamsaketh.in --cache-from type=gha,scope=frontend frontend
+          docker run -d --name fe -p 8080:10000 -e PORT=10000 -e BACKEND_HOSTPORT=example.invalid:80 aura-frontend:test
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="root">'
+          curl -fsS "http://127.0.0.1:8080/messenger?s=chats" | grep -q '<div id="root">'
+          docker logs fe 2>&1 | tail -5
 
   smoke-test:
     name: Smoke test · live site
-    needs: [deploy-frontend]
-    if: needs.deploy-frontend.result == 'success'
+    if: github.event_name == 'workflow_dispatch' && inputs.smoke_test
     runs-on: ubuntu-latest
     steps:
-      - name: Frontend, API, API through the Vercel rewrite, CORS for the frontend origin
+      - name: Frontend, API, same-origin /api proxy, CORS for the frontend origin
         run: |
           set -e
           curl -fsS https://aura.pvsairamsaketh.in/ | grep -q '<div id="root">'
+          curl -fsS https://aura.pvsairamsaketh.in/messenger | grep -q '<div id="root">'
+          curl -fsS https://api.aura.pvsairamsaketh.in/healthz | grep -q ok
           curl -fsS https://api.aura.pvsairamsaketh.in/api/health/ | grep -q '"ok"'
           curl -fsS https://aura.pvsairamsaketh.in/api/health/ | grep -q '"ok"'
           curl -fsSI -H "Origin: https://aura.pvsairamsaketh.in" https://api.aura.pvsairamsaketh.in/api/auth/session/ \

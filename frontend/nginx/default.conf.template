@@ -1,0 +1,42 @@
+# Rendered at container start by the nginx image (envsubst on ${PORT}, ${BACKEND_HOSTPORT}, ${NGINX_LOCAL_RESOLVERS}).
+#   Render:          PORT from Render, BACKEND_HOSTPORT from the Blueprint (the backend's private-network host:port)
+#   docker-compose:  PORT=80, BACKEND_HOSTPORT=backend:8000
+# The SPA calls the API host directly when built with VITE_API_URL; this proxy serves same-origin /api links that are
+# rendered into the page (images, audio, files) and is the whole API path when VITE_API_URL is empty (compose).
+resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+
+server {
+  listen ${PORT};
+  root /usr/share/nginx/html;
+  client_max_body_size 160m;
+  server_tokens off;
+
+  gzip on;
+  gzip_comp_level 6;
+  gzip_min_length 1024;
+  gzip_types text/plain text/css application/javascript application/json image/svg+xml application/wasm;
+
+  set $backend http://${BACKEND_HOSTPORT};
+
+  location /api/ {
+    proxy_pass $backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 300s;
+    proxy_request_buffering off;
+  }
+  location /ws/ {
+    proxy_pass $backend;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    proxy_read_timeout 1h;
+  }
+  location = /healthz { access_log off; return 200 "ok"; add_header Content-Type text/plain; }
+  location /assets/ { expires 1y; add_header Cache-Control "public, max-age=31536000, immutable"; try_files $uri =404; }
+  location = /index.html { add_header Cache-Control "no-cache"; }
+  location / { try_files $uri $uri/ /index.html; }
+}

@@ -24,3 +24,8 @@ async def test_websocket_rejects_anonymous():
     connected, code = await comm.connect()
     assert not connected
     await comm.disconnect()
+
+
+def test_healthz_liveness_needs_no_host_or_database(client):
+    r = client.get("/healthz", HTTP_HOST="10.0.0.5:10000")  # an internal address that isn't in ALLOWED_HOSTS
+    assert r.status_code == 200 and r.content == b"ok"

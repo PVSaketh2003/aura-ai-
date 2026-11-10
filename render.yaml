@@ -1,29 +1,37 @@
-# Render Blueprint for the Aura backend (https://render.com/docs/blueprint-spec).
-# The web service runs the Docker image that GitHub Actions pushes to Docker Hub; CI triggers a deploy through the
-# service's deploy hook with the exact image tag. Values marked sync:false are entered once in the Render dashboard.
+# Render Blueprint: the complete Aura app (https://render.com/docs/blueprint-spec)
+#   aura-backend   Django + Channels (Daphne), Docker build of backend/Dockerfile, 20 GB disk at /var/data
+#   aura-frontend  React build served by nginx, Docker build of frontend/Dockerfile
+#   aura-db        PostgreSQL 16          aura-redis  Key Value (Redis-compatible) for Django Channels
+# Both services build from this GitHub repo and auto-deploy only after GitHub Actions checks pass, and only when
+# their own folder changed. Values marked sync:false are secrets you type once in the Render dashboard.
 services:
   - type: web
     name: aura-backend
-    runtime: image
-    image:
-      url: docker.io/REPLACE_WITH_DOCKERHUB_USERNAME/aura-backend:latest
-    plan: standard            # 2 GB RAM: chat, RAG, messenger. Voice (local speech models) needs "pro" (4 GB) or more.
+    runtime: docker
     region: singapore
-    healthCheckPath: /api/health/
+    plan: standard                       # 2 GB RAM. Voice with local speech models needs "pro" (4 GB) or more.
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths: ["backend/**"]
     disk:
       name: aura-data
-      mountPath: /var/data    # ChromaDB, uploads, downloaded speech models — survives deploys
+      mountPath: /var/data               # ChromaDB, uploads, media, downloaded speech models: survive deploys
       sizeGB: 20
+    domains:
+      - api.aura.pvsairamsaketh.in
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_DEBUG
         value: "false"
-      - key: ALLOWED_HOSTS
-        value: api.aura.pvsairamsaketh.in,aura-backend.onrender.com
-      - key: FRONTEND_ORIGINS
+      - key: ALLOWED_HOSTS                # API domain, Render URL, and the frontend host (its nginx proxies /api links)
+        value: api.aura.pvsairamsaketh.in,aura.pvsairamsaketh.in,.onrender.com
+      - key: FRONTEND_ORIGINS             # CORS + CSRF trusted origins
         value: https://aura.pvsairamsaketh.in
-      - key: COOKIE_DOMAIN
+      - key: COOKIE_DOMAIN                # one login across aura.… and api.aura.…
         value: .pvsairamsaketh.in
       - key: SECURE_COOKIES
         value: "true"
@@ -33,13 +41,21 @@ services:
         fromDatabase: { name: aura-db, property: connectionString }
       - key: REDIS_URL
         fromService: { type: keyvalue, name: aura-redis, property: connectionString }
-      - key: OLLAMA_BASE_URL     # an Ollama endpoint reachable from Render (see README → Deployment)
+      - key: MEDIA_ROOT
+        value: /var/data/media
+      - key: CHROMA_PATH
+        value: /var/data/app/chroma
+      - key: OLLAMA_BASE_URL              # an Ollama endpoint reachable from Render (README → Deployment)
         sync: false
       - key: OLLAMA_API_KEY
         sync: false
-      - key: HF_TOKEN            # gated IndicConformer download (Telugu/Hindi speech)
+      - key: LLM_MODEL
+        value: gemma3:4b
+      - key: EMBEDDING_MODEL
+        value: qwen3-embedding:4b
+      - key: HF_TOKEN                     # read token with access to the gated IndicConformer model
         sync: false
-      - key: SMS_BACKEND         # "twilio" for real phone verification
+      - key: SMS_BACKEND                  # "twilio" for phone sign-up; leave empty to disable phone verification
         sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
@@ -47,14 +63,40 @@ services:
         sync: false
       - key: TWILIO_VERIFY_SERVICE_SID
         sync: false
+      - key: WEBRTC_ICE_SERVERS           # JSON list of STUN/TURN servers for calls across networks
+        value: '[{"urls":"stun:stun.l.google.com:19302"}]'
+
+  - type: web
+    name: aura-frontend
+    runtime: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths: ["frontend/**"]
+    domains:
+      - aura.pvsairamsaketh.in
+    envVars:
+      - key: VITE_API_URL                 # public: baked into the JS at build time (no secrets here)
+        value: https://api.aura.pvsairamsaketh.in
+      - key: BACKEND_HOSTPORT             # backend's private-network address, for same-origin /api media links
+        fromService: { type: web, name: aura-backend, property: hostport }
+
   - type: keyvalue
     name: aura-redis
-    plan: starter
     region: singapore
-    ipAllowList: []           # internal network only
+    plan: free                            # Channels only needs pub/sub, no persistence
+    maxmemoryPolicy: noeviction
+    ipAllowList: []                       # private network only
+
 databases:
   - name: aura-db
-    plan: basic-256mb
     region: singapore
+    plan: basic-256mb
     postgresMajorVersion: "16"
-    ipAllowList: []
+    databaseName: aura
+    user: aura
+    ipAllowList: []                       # private network only
